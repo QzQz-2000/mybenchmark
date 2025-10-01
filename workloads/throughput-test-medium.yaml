@@ -1,0 +1,14 @@
+# Medium throughput test - 10K msg/s
+name: Medium Throughput Test / 10K msg/s
+
+topics: 1
+partitionsPerTopic: 1
+keyDistributor: "NO_KEY"
+messageSize: 1024
+subscriptionsPerTopic: 1
+consumerPerSubscription: 1
+producersPerTopic: 1
+producerRate: 10000        # 10K msg/s
+consumerBacklogSizeGB: 0
+testDurationMinutes: 2     # 2 minutes
+warmupDurationMinutes: 0

@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Kafka cluster
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - benchmark-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: localhost
+      # Performance tuning
+      KAFKA_NUM_NETWORK_THREADS: 8
+      KAFKA_NUM_IO_THREADS: 16
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
+      KAFKA_LOG_RETENTION_HOURS: 1
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+    networks:
+      - benchmark-net
+
+  # Benchmark worker nodes
+  worker-1:
+    build: .
+    container_name: benchmark-worker-1
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      WORKER_ID: worker-1
+      WORKER_PORT: 8080
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    command: >
+      python scripts/start_worker.py kafka
+      --worker-id worker-1
+      --driver-config configs/kafka-throughput.yaml
+      --client-type kafka-python
+      --host 0.0.0.0
+      --port 8080
+    networks:
+      - benchmark-net
+
+  worker-2:
+    build: .
+    container_name: benchmark-worker-2
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      WORKER_ID: worker-2
+      WORKER_PORT: 8081
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    command: >
+      python scripts/start_worker.py kafka
+      --worker-id worker-2
+      --driver-config configs/kafka-throughput.yaml
+      --client-type confluent-kafka
+      --host 0.0.0.0
+      --port 8081
+    networks:
+      - benchmark-net
+
+  worker-3:
+    build: .
+    container_name: benchmark-worker-3
+    depends_on:
+      - kafka
+    ports:
+      - "8082:8082"
+    environment:
+      WORKER_ID: worker-3
+      WORKER_PORT: 8082
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    command: >
+      python scripts/start_worker.py kafka
+      --worker-id worker-3
+      --driver-config configs/kafka-throughput.yaml
+      --client-type aiokafka
+      --host 0.0.0.0
+      --port 8082
+    networks:
+      - benchmark-net
+
+networks:
+  benchmark-net:
+    driver: bridge

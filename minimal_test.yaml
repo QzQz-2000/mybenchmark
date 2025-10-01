@@ -1,0 +1,11 @@
+# Minimal test workload
+name: Minimal Test
+topics: 1
+partitionsPerTopic: 1
+messageSize: 100
+producersPerTopic: 1
+producerRate: 10  # Very slow - only 10 msg/s
+consumerPerSubscription: 1
+subscriptionsPerTopic: 1
+testDurationMinutes: 1
+warmupDurationMinutes: 0

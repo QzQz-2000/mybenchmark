@@ -1,0 +1,27 @@
+# Digital Twin Sensor Data Stream Test
+# Simulates high-frequency sensor data from manufacturing equipment
+
+name: Digital Twin Sensor Stream Test / 10K sensors @ 1Hz
+description: "Simulates 10,000 sensors sending data every second (typical IoT scenario)"
+
+# Topology optimized for Digital Twin
+topics: 10                          # Separate topics for different sensor types
+partitionsPerTopic: 16              # High partition count for parallel processing
+keyDistributor: "ROUND_ROBIN"       # Distribute sensors across partitions
+
+# Message characteristics typical of IoT sensor data
+messageSize: 512                    # 512 bytes - typical for sensor telemetry with metadata
+payloadFile: null                   # Will use generated sensor-like data
+
+# Producer configuration for sensor simulation
+producersPerTopic: 10               # 100 total producers (10 per topic)
+producerRate: 1000                  # 1000 messages/sec per producer = 10K total msg/s
+
+# Consumer configuration for real-time processing
+subscriptionsPerTopic: 2            # 2 consumer groups per topic (e.g., storage + analytics)
+consumerPerSubscription: 4          # 4 consumers per group for parallel processing
+consumerBacklogSizeGB: 0            # Real-time processing, no backlog
+
+# Test duration optimized for Digital Twin validation
+testDurationMinutes: 10             # 10 minutes sustained test
+warmupDurationMinutes: 2            # 2 minutes warmup for connection establishment

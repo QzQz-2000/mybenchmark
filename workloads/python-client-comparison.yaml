@@ -1,0 +1,16 @@
+# Python Kafka client comparison test
+# Designed to compare kafka-python, confluent-kafka, and aiokafka
+
+name: Python Client Comparison
+
+topics: 1
+partitionsPerTopic: 8
+keyDistributor: "ROUND_ROBIN"
+messageSize: 1024
+subscriptionsPerTopic: 1
+consumerPerSubscription: 2
+producersPerTopic: 2
+producerRate: 100000
+consumerBacklogSizeGB: 0
+testDurationMinutes: 15
+warmupDurationMinutes: 2
