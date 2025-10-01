@@ -84,78 +84,96 @@ class KafkaWorkerMultiProcess(BaseWorker):
     async def run_producer_tasks(
         self,
         tasks: List[ProducerTask]
-    ) -> List[WorkerResult]:
+    ) -> None:
         """
-        运行多个 producer 任务
+        启动多个 producer 任务 (Java OMB style)
 
-        每个任务运行在独立进程中，真实模拟多 agent 并发负载。
+        每个任务运行在独立进程中，持续运行直到收到 stop 信号。
+        此方法启动任务后立即返回。
 
         Args:
             tasks: Producer 任务列表
-
-        Returns:
-            所有任务的执行结果
         """
         self.logger.info(
             f"📤 收到 {len(tasks)} 个 Producer 任务，"
-            f"每个任务将运行在独立进程中..."
+            f"每个任务将运行在独立进程中 (持续模式)..."
         )
 
-        # 使用进程执行器运行所有任务
-        results = await self._process_executor.execute_producer_tasks(
+        # 使用进程执行器启动所有任务（不等待完成）
+        await self._process_executor.execute_producer_tasks(
             tasks,
             self.driver_config
         )
 
-        # 统计
-        total_messages = sum(r.throughput.total_messages for r in results)
-        total_rate = sum(r.throughput.messages_per_second for r in results)
-
-        self.logger.info(
-            f"✅ 所有 {len(tasks)} 个 Producer 任务完成: "
-            f"{total_messages} 条消息, "
-            f"{total_rate:.1f} msg/s"
-        )
-
-        return results
+        self.logger.info(f"✅ 所有 {len(tasks)} 个 Producer 任务已启动")
 
     async def run_consumer_tasks(
         self,
         tasks: List[ConsumerTask]
-    ) -> List[WorkerResult]:
+    ) -> None:
         """
-        运行多个 consumer 任务
+        启动多个 consumer 任务 (Java OMB style)
 
-        每个任务运行在独立进程中，真实模拟多 agent 并发负载。
+        每个任务运行在独立进程中，持续运行直到收到 stop 信号。
+        此方法启动任务后立即返回。
 
         Args:
             tasks: Consumer 任务列表
-
-        Returns:
-            所有任务的执行结果
         """
         self.logger.info(
             f"📥 收到 {len(tasks)} 个 Consumer 任务，"
-            f"每个任务将运行在独立进程中..."
+            f"每个任务将运行在独立进程中 (持续模式)..."
         )
 
-        # 使用进程执行器运行所有任务
-        results = await self._process_executor.execute_consumer_tasks(
+        # 使用进程执行器启动所有任务（不等待完成）
+        await self._process_executor.execute_consumer_tasks(
             tasks,
             self.driver_config
         )
 
-        # 统计
-        total_messages = sum(r.throughput.total_messages for r in results)
-        total_rate = sum(r.throughput.messages_per_second for r in results)
+        self.logger.info(f"✅ 所有 {len(tasks)} 个 Consumer 任务已启动")
+
+    async def stop_all_tasks(self):
+        """
+        Stop all running tasks - Java OMB style
+
+        Triggers stop signal for all producer and consumer processes.
+        """
+        self.logger.info("🛑 Stopping all running tasks...")
+        if self._process_executor:
+            await self._process_executor.stop_all()
+            self.logger.info("✅ Stop signal sent to all tasks")
+
+    async def wait_for_completion(self) -> List[WorkerResult]:
+        """
+        Wait for all tasks to complete and collect results.
+
+        Should be called after stop_all_tasks().
+        Returns results from all processes.
+        """
+        self.logger.info("⏳ Waiting for all tasks to complete...")
+        if not self._process_executor:
+            return []
+
+        # Get raw process results
+        process_results = await self._process_executor.wait_for_completion()
+
+        # Convert to WorkerResults
+        worker_results = []
+        for pr in process_results:
+            wr = self._process_executor._convert_to_worker_result(pr)
+            worker_results.append(wr)
+
+        # Statistics
+        total_messages_sent = sum(r.throughput.total_messages for r in worker_results if r.task_type == 'producer')
+        total_messages_received = sum(r.throughput.total_messages for r in worker_results if r.task_type == 'consumer')
 
         self.logger.info(
-            f"✅ 所有 {len(tasks)} 个 Consumer 任务完成: "
-            f"{total_messages} 条消息, "
-            f"{total_rate:.1f} msg/s"
+            f"✅ All tasks completed: "
+            f"Sent {total_messages_sent}, Received {total_messages_received}"
         )
 
-        return results
+        return worker_results
 
     async def _execute_producer_task(self, task: ProducerTask) -> Dict[str, Any]:
         """

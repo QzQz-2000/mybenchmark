@@ -1,0 +1,324 @@
+{
+  "test_id": "Quick_1_Producer_Test_1759359628",
+  "test_name": "Quick 1 Producer Test",
+  "start_time": 1759359628.572407,
+  "end_time": 1759359697.080251,
+  "workload_config": {
+    "name": "Quick 1 Producer Test",
+    "topics": 1,
+    "partitions_per_topic": 16,
+    "key_distributor": "NO_KEY",
+    "message_size": 1024,
+    "payload_file": null,
+    "producers_per_topic": 1,
+    "producer_rate": 1000,
+    "subscriptions_per_topic": 1,
+    "consumer_per_subscription": 4,
+    "consumer_backlog_size_gb": 0,
+    "test_duration_minutes": 1,
+    "warmup_duration_minutes": 0
+  },
+  "driver_config": {
+    "name": "Kafka Digital Twin Driver",
+    "driver_class": "benchmark.drivers.kafka.KafkaDriver",
+    "common_config": {
+      "bootstrap.servers": "localhost:9092",
+      "default.api.timeout.ms": 300000,
+      "request.timeout.ms": 120000,
+      "socket.keepalive.enable": true,
+      "socket.send.buffer.bytes": 131072,
+      "socket.receive.buffer.bytes": 131072
+    },
+    "producer_config": {
+      "acks": "all",
+      "enable.idempotence": true,
+      "retries": 2147483647,
+      "delivery.timeout.ms": 300000,
+      "retry.backoff.ms": 100,
+      "batch.size": 65536,
+      "linger.ms": 5,
+      "compression.type": "lz4",
+      "buffer.memory": 67108864,
+      "max.request.size": 2097152,
+      "connections.max.idle.ms": 300000,
+      "max.in.flight.requests.per.connection": 5,
+      "client.id": "digital-twin-producer"
+    },
+    "consumer_config": {
+      "auto.offset.reset": "earliest",
+      "enable.auto.commit": false,
+      "fetch.min.bytes": 1,
+      "fetch.max.bytes": 52428800,
+      "max.partition.fetch.bytes": 1048576,
+      "session.timeout.ms": 30000,
+      "heartbeat.interval.ms": 3000,
+      "max.poll.interval.ms": 300000,
+      "connections.max.idle.ms": 300000,
+      "client.id": "digital-twin-consumer"
+    },
+    "topic_config": {
+      "min.insync.replicas": 1,
+      "cleanup.policy": "delete",
+      "retention.ms": 86400000,
+      "segment.ms": 3600000,
+      "compression.type": "lz4",
+      "segment.bytes": 268435456,
+      "max.message.bytes": 2097152
+    },
+    "replication_factor": 1,
+    "reset": true
+  },
+  "producer_results": [
+    {
+      "worker_id": "worker-1-process-84625",
+      "worker_url": "http://localhost:8001",
+      "task_type": "producer",
+      "start_time": 1759359643.8405519,
+      "end_time": 1759359695.1067479,
+      "throughput": {
+        "total_messages": 40631,
+        "total_bytes": 41606144,
+        "duration_seconds": 51.26619601249695,
+        "messages_per_second": 792.5495386881357,
+        "bytes_per_second": 811570.727616651,
+        "mb_per_second": 0.7739741588751325
+      },
+      "latency": {
+        "count": 40631,
+        "min_ms": 1.1398792266845703,
+        "max_ms": 514.3721103668213,
+        "mean_ms": 31.457622498783625,
+        "median_ms": 18.895,
+        "p50_ms": 18.895,
+        "p95_ms": 90.943,
+        "p99_ms": 180.479,
+        "p99_9_ms": 422.143,
+        "histogram_data": null
+      },
+      "errors": {
+        "total_errors": 0,
+        "error_rate": 0.0,
+        "error_types": {}
+      },
+      "metadata": {
+        "task_id": "producer-0",
+        "pid": 84625,
+        "success": true,
+        "error_message": null
+      }
+    }
+  ],
+  "consumer_results": [
+    {
+      "worker_id": "worker-1-process-84611",
+      "worker_url": "http://localhost:8001",
+      "task_type": "consumer",
+      "start_time": 1759359641.371663,
+      "end_time": 1759359695.454081,
+      "throughput": {
+        "total_messages": 10318,
+        "total_bytes": 10565632,
+        "duration_seconds": 54.0824179649353,
+        "messages_per_second": 190.782890045518,
+        "bytes_per_second": 195361.67940661043,
+        "mb_per_second": 0.18631141606007617
+      },
+      "latency": {
+        "count": 10318,
+        "min_ms": 9.178955078125,
+        "max_ms": 1213.134033203125,
+        "mean_ms": 596.3922403789949,
+        "median_ms": 620.543,
+        "p50_ms": 620.543,
+        "p95_ms": 1035.775,
+        "p99_ms": 1129.471,
+        "p99_9_ms": 1204.223,
+        "histogram_data": null
+      },
+      "errors": {
+        "total_errors": 0,
+        "error_rate": 0.0,
+        "error_types": {}
+      },
+      "metadata": {
+        "task_id": "consumer-1",
+        "pid": 84611,
+        "success": true,
+        "error_message": null
+      }
+    },
+    {
+      "worker_id": "worker-1-process-84612",
+      "worker_url": "http://localhost:8001",
+      "task_type": "consumer",
+      "start_time": 1759359640.965098,
+      "end_time": 1759359695.477472,
+      "throughput": {
+        "total_messages": 10576,
+        "total_bytes": 10829824,
+        "duration_seconds": 54.51237416267395,
+        "messages_per_second": 194.0109958968117,
+        "bytes_per_second": 198667.25979833517,
+        "mb_per_second": 0.18946386318048017
+      },
+      "latency": {
+        "count": 10576,
+        "min_ms": 8.37109375,
+        "max_ms": 1339.822021484375,
+        "mean_ms": 566.9771398870379,
+        "median_ms": 555.007,
+        "p50_ms": 555.007,
+        "p95_ms": 1030.143,
+        "p99_ms": 1090.559,
+        "p99_9_ms": 1316.863,
+        "histogram_data": null
+      },
+      "errors": {
+        "total_errors": 0,
+        "error_rate": 0.0,
+        "error_types": {}
+      },
+      "metadata": {
+        "task_id": "consumer-2",
+        "pid": 84612,
+        "success": true,
+        "error_message": null
+      }
+    },
+    {
+      "worker_id": "worker-1-process-84610",
+      "worker_url": "http://localhost:8001",
+      "task_type": "consumer",
+      "start_time": 1759359641.061006,
+      "end_time": 1759359695.514312,
+      "throughput": {
+        "total_messages": 10162,
+        "total_bytes": 10405888,
+        "duration_seconds": 54.45330595970154,
+        "messages_per_second": 186.6186050764382,
+        "bytes_per_second": 191097.45159827272,
+        "mb_per_second": 0.18224473151995918
+      },
+      "latency": {
+        "count": 10162,
+        "min_ms": 8.74609375,
+        "max_ms": 1418.85302734375,
+        "mean_ms": 567.9939887398365,
+        "median_ms": 560.639,
+        "p50_ms": 560.639,
+        "p95_ms": 1034.239,
+        "p99_ms": 1104.895,
+        "p99_9_ms": 1405.951,
+        "histogram_data": null
+      },
+      "errors": {
+        "total_errors": 0,
+        "error_rate": 0.0,
+        "error_types": {}
+      },
+      "metadata": {
+        "task_id": "consumer-0",
+        "pid": 84610,
+        "success": true,
+        "error_message": null
+      }
+    },
+    {
+      "worker_id": "worker-1-process-84613",
+      "worker_url": "http://localhost:8001",
+      "task_type": "consumer",
+      "start_time": 1759359641.258656,
+      "end_time": 1759359695.721775,
+      "throughput": {
+        "total_messages": 9575,
+        "total_bytes": 9804800,
+        "duration_seconds": 54.46311902999878,
+        "messages_per_second": 175.80704466679558,
+        "bytes_per_second": 180026.41373879867,
+        "mb_per_second": 0.17168656705741756
+      },
+      "latency": {
+        "count": 9575,
+        "min_ms": 7.72119140625,
+        "max_ms": 1433.74609375,
+        "mean_ms": 573.4059064437827,
+        "median_ms": 578.047,
+        "p50_ms": 578.047,
+        "p95_ms": 1022.975,
+        "p99_ms": 1102.847,
+        "p99_9_ms": 1208.319,
+        "histogram_data": null
+      },
+      "errors": {
+        "total_errors": 0,
+        "error_rate": 0.0,
+        "error_types": {}
+      },
+      "metadata": {
+        "task_id": "consumer-3",
+        "pid": 84613,
+        "success": true,
+        "error_message": null
+      }
+    }
+  ],
+  "producer_stats": {
+    "total_messages": 40631,
+    "total_bytes": 41606144,
+    "duration_seconds": 51.26619601249695,
+    "messages_per_second": 792.5495386881357,
+    "bytes_per_second": 811570.727616651,
+    "mb_per_second": 0.7739741588751325
+  },
+  "consumer_stats": {
+    "total_messages": 40631,
+    "total_bytes": 41606144,
+    "duration_seconds": 54.51237416267395,
+    "messages_per_second": 745.353704073691,
+    "bytes_per_second": 763242.1929714596,
+    "mb_per_second": 0.7278844766344639
+  },
+  "latency_stats": {
+    "count": 40631,
+    "min_ms": 1.1398792266845703,
+    "max_ms": 514.3721103668213,
+    "mean_ms": 31.457622498783625,
+    "median_ms": 18.895,
+    "p50_ms": 18.895,
+    "p95_ms": 90.943,
+    "p99_ms": 180.479,
+    "p99_9_ms": 422.143,
+    "histogram_data": null
+  },
+  "system_stats": {
+    "cpu": {
+      "avg": 61.86060606060607,
+      "max": 80.2,
+      "min": 46.3,
+      "p95": 76.325,
+      "p99": 79.355
+    },
+    "memory": {
+      "avg": 60.39242424242424,
+      "max": 61.7,
+      "min": 59.7
+    },
+    "network": {
+      "avg_sent_mbps": 0.21061197916666666,
+      "avg_recv_mbps": 0.21059718276515152,
+      "max_sent_mbps": 0.3076171875,
+      "max_recv_mbps": 0.3076171875,
+      "total_sent_mb": 13.900390625,
+      "total_recv_mb": 13.8994140625
+    },
+    "disk": {
+      "avg_read_mbps": 9.080847537878787,
+      "avg_write_mbps": 4.041370738636363,
+      "max_read_mbps": 155.86328125,
+      "max_write_mbps": 253.0703125,
+      "total_read_mb": 599.3359375,
+      "total_write_mb": 266.73046875
+    }
+  },
+  "metadata": {}
+}

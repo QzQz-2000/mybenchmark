@@ -101,8 +101,30 @@ class KafkaConsumer(AbstractConsumer, LoggerMixin):
         self._subscribed_topics = topics
 
         def blocking_subscribe():
+            import time as blocking_time
             self._consumer.subscribe(topics)
-            # Don't wait for assignment - let it happen naturally during consume
+            print(f"[CONSUMER DEBUG] Subscribed to {topics}, waiting for partition assignment...", flush=True)
+
+            # CRITICAL: Wait for partition assignment to complete
+            # Without this, consumer won't receive any messages!
+            max_wait_time = 10  # 10 seconds should be enough
+            start_wait = blocking_time.time()
+
+            while blocking_time.time() - start_wait < max_wait_time:
+                # Poll to trigger partition assignment
+                msg = self._consumer.poll(timeout=0.1)
+
+                # Check if we have partition assignment
+                assignment = self._consumer.assignment()
+                if assignment:
+                    print(f"[CONSUMER DEBUG] ✅ Partition assignment complete: {assignment}", flush=True)
+                    break
+
+                blocking_time.sleep(0.1)
+            else:
+                print(f"[CONSUMER DEBUG] ⚠️  Partition assignment timeout after {max_wait_time}s!", flush=True)
+                assignment = self._consumer.assignment()
+                print(f"[CONSUMER DEBUG] Final assignment status: {assignment}", flush=True)
 
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(self._executor, blocking_subscribe)

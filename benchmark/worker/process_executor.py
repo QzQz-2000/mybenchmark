@@ -50,9 +50,10 @@ class ProcessResult:
 
 class ProcessExecutor(LoggerMixin):
     """
-    多进程执行器
+    多进程执行器 - Java OMB style with stop signal
 
     负责管理多个独立的 producer/consumer 进程，每个任务运行在独立进程中。
+    使用共享的 stop_event 来控制所有进程的停止（类似 Java OMB 的 testCompleted flag）。
     """
 
     def __init__(self, worker_id: str):
@@ -60,32 +61,46 @@ class ProcessExecutor(LoggerMixin):
         self.worker_id = worker_id
         self._processes: List[mp.Process] = []
         self._result_queue = mp.Queue()
+        self._stop_event = mp.Event()  # Shared stop signal (Java OMB style)
+
+    def reset(self):
+        """Reset executor state for a new test run."""
+        self._processes.clear()
+        self._stop_event.clear()
+        # Clear result queue
+        while not self._result_queue.empty():
+            try:
+                self._result_queue.get_nowait()
+            except:
+                break
+        self.logger.info("ProcessExecutor reset for new test run")
 
     async def execute_producer_tasks(
         self,
         tasks: List[ProducerTask],
         driver_config: DriverConfig
-    ) -> List[WorkerResult]:
+    ) -> None:
         """
-        执行多个 producer 任务，每个任务一个独立进程
+        启动多个 producer 任务，每个任务一个独立进程 (Java OMB style)
+
+        进程将持续运行直到收到 stop 信号。
+        此方法启动进程后立即返回，不等待完成。
 
         Args:
             tasks: Producer 任务列表
             driver_config: Driver 配置
-
-        Returns:
-            所有 producer 的执行结果
         """
-        # 清空之前的进程列表（确保不累积）
-        self._processes.clear()
+        # NOTE: Do NOT clear _processes or _stop_event here!
+        # In Java OMB style, consumers are started first, then producers.
+        # Both share the same process list and stop signal.
 
-        self.logger.info(f"🚀 启动 {len(tasks)} 个独立 Producer 进程...")
+        self.logger.info(f"🚀 启动 {len(tasks)} 个独立 Producer 进程 (持续模式)...")
 
-        # 启动所有 producer 进程
+        # 启动所有 producer 进程 - 传递 stop_event
         for task in tasks:
             process = mp.Process(
                 target=_producer_process_main,
-                args=(task, driver_config, self._result_queue),
+                args=(task, driver_config, self._result_queue, self._stop_event),  # Pass stop_event
                 name=f"producer-{task.task_id}"
             )
             process.start()
@@ -95,44 +110,35 @@ class ProcessExecutor(LoggerMixin):
                 f"   ✅ 启动 Producer: {task.task_id} (PID: {process.pid})"
             )
 
-        # 等待所有进程完成
-        results = await self._wait_for_processes(len(tasks))
-
-        # 转换为 WorkerResult
-        worker_results = []
-        for result in results:
-            worker_result = self._convert_to_worker_result(result)
-            worker_results.append(worker_result)
-
-        self.logger.info(f"✨ 所有 {len(tasks)} 个 Producer 进程已完成")
-
-        return worker_results
+        self.logger.info(f"✨ 所有 {len(tasks)} 个 Producer 进程已启动，等待 stop 信号...")
 
     async def execute_consumer_tasks(
         self,
         tasks: List[ConsumerTask],
         driver_config: DriverConfig
-    ) -> List[WorkerResult]:
+    ) -> None:
         """
-        执行多个 consumer 任务，每个任务一个独立进程
+        启动多个 consumer 任务，每个任务一个独立进程 (Java OMB style)
+
+        进程将持续运行直到收到 stop 信号。
+        此方法启动进程后立即返回，不等待完成。
+
+        在 Java OMB 风格中，Consumers 先启动，所以在这里重置状态。
 
         Args:
             tasks: Consumer 任务列表
             driver_config: Driver 配置
-
-        Returns:
-            所有 consumer 的执行结果
         """
-        # 清空之前的进程列表（确保不累积）
-        self._processes.clear()
+        # Reset state for new test run (consumers are started first)
+        self.reset()
 
-        self.logger.info(f"🚀 启动 {len(tasks)} 个独立 Consumer 进程...")
+        self.logger.info(f"🚀 启动 {len(tasks)} 个独立 Consumer 进程 (持续模式)...")
 
-        # 启动所有 consumer 进程
+        # 启动所有 consumer 进程 - 传递 stop_event
         for task in tasks:
             process = mp.Process(
                 target=_consumer_process_main,
-                args=(task, driver_config, self._result_queue),
+                args=(task, driver_config, self._result_queue, self._stop_event),  # Pass stop_event
                 name=f"consumer-{task.task_id}"
             )
             process.start()
@@ -142,36 +148,33 @@ class ProcessExecutor(LoggerMixin):
                 f"   ✅ 启动 Consumer: {task.task_id} (PID: {process.pid})"
             )
 
-        # 等待所有进程完成
-        results = await self._wait_for_processes(len(tasks))
+        self.logger.info(f"✨ 所有 {len(tasks)} 个 Consumer 进程已启动，等待 stop 信号...")
 
-        # 转换为 WorkerResult
-        worker_results = []
-        for result in results:
-            worker_result = self._convert_to_worker_result(result)
-            worker_results.append(worker_result)
-
-        self.logger.info(f"✨ 所有 {len(tasks)} 个 Consumer 进程已完成")
-
-        return worker_results
-
-    async def _wait_for_processes(self, expected_count: int) -> List[ProcessResult]:
+    async def stop_all(self):
         """
-        等待所有进程完成并收集结果
+        Stop all running processes - Java OMB style
 
-        Args:
-            expected_count: 期望的结果数量
-
-        Returns:
-            所有进程的结果
+        Sets the stop_event to signal all processes to complete gracefully.
         """
+        self.logger.info("🛑 Setting stop signal for all processes...")
+        self._stop_event.set()
+
+    async def wait_for_completion(self) -> List[ProcessResult]:
+        """
+        Wait for all processes to complete and collect results.
+
+        This should be called after stop_all() has been called.
+        """
+        total_processes = len(self._processes)
+        self.logger.info(f"⏳ Waiting for {total_processes} processes to complete...")
+
         results = []
 
-        # 等待所有进程
+        # Wait for all processes to finish
         for process in self._processes:
             process.join()
 
-        # 收集所有结果
+        # Collect all results
         while not self._result_queue.empty():
             try:
                 result_dict = self._result_queue.get_nowait()
@@ -180,10 +183,12 @@ class ProcessExecutor(LoggerMixin):
             except Exception as e:
                 self.logger.error(f"收集结果失败: {e}")
 
-        if len(results) != expected_count:
+        if len(results) != total_processes:
             self.logger.warning(
-                f"期望 {expected_count} 个结果，实际收到 {len(results)} 个"
+                f"期望 {total_processes} 个结果，实际收到 {len(results)} 个"
             )
+
+        self.logger.info(f"✅ 所有 {total_processes} 个进程已完成，收到 {len(results)} 个结果")
 
         return results
 
@@ -271,19 +276,21 @@ class ProcessExecutor(LoggerMixin):
 def _producer_process_main(
     task: ProducerTask,
     driver_config: DriverConfig,
-    result_queue: mp.Queue
+    result_queue: mp.Queue,
+    stop_event: mp.Event  # NEW: stop signal from coordinator
 ):
     """
-    Producer 进程主函数（运行在独立进程中）
+    Producer 进程主函数（运行在独立进程中）- Java OMB style
 
-    这是每个 producer agent 的入口点，模拟真实的独立应用。
+    Runs continuously until stop_event is set by coordinator.
+    模拟真实的独立应用，持续发送消息直到收到停止信号。
     """
     try:
         # 在子进程中需要重新导入和初始化
         import asyncio
 
-        # 运行异步逻辑
-        result = asyncio.run(_run_producer_async(task, driver_config))
+        # 运行异步逻辑（传递 stop_event）
+        result = asyncio.run(_run_producer_async(task, driver_config, stop_event))
 
         # 返回结果
         result_queue.put(result.to_dict())
@@ -305,19 +312,21 @@ def _producer_process_main(
 def _consumer_process_main(
     task: ConsumerTask,
     driver_config: DriverConfig,
-    result_queue: mp.Queue
+    result_queue: mp.Queue,
+    stop_event: mp.Event  # NEW: stop signal from coordinator
 ):
     """
-    Consumer 进程主函数（运行在独立进程中）
+    Consumer 进程主函数（运行在独立进程中）- Java OMB style
 
-    这是每个 consumer agent 的入口点，模拟真实的独立应用。
+    Runs continuously until stop_event is set by coordinator.
+    模拟真实的独立应用，持续消费消息直到收到停止信号。
     """
     try:
         # 在子进程中需要重新导入和初始化
         import asyncio
 
-        # 运行异步逻辑
-        result = asyncio.run(_run_consumer_async(task, driver_config))
+        # 运行异步逻辑（传递 stop_event）
+        result = asyncio.run(_run_consumer_async(task, driver_config, stop_event))
 
         # 返回结果
         result_queue.put(result.to_dict())
@@ -338,17 +347,20 @@ def _consumer_process_main(
 
 async def _run_producer_async(
     task: ProducerTask,
-    driver_config: DriverConfig
+    driver_config: DriverConfig,
+    stop_event: mp.Event
 ) -> ProcessResult:
     """
-    异步运行 producer 逻辑（在子进程中）
+    异步运行 producer 逻辑（在子进程中）- Java OMB continuous mode
+
+    Runs continuously at specified rate until stop_event is set.
     """
     from benchmark.drivers.kafka import KafkaDriver
     from benchmark.drivers.base import Message, DriverUtils
     from benchmark.utils.rate_limiter import create_rate_limiter
 
     pid = mp.current_process().pid
-    print(f"[Producer {task.task_id} PID:{pid}] 🚀 启动", flush=True)
+    print(f"[Producer {task.task_id} PID:{pid}] 🚀 启动 (持续模式)", flush=True)
 
     start_time = time.time()
     messages_sent = 0
@@ -368,6 +380,7 @@ async def _run_producer_async(
         rate_limiter = None
         if task.rate_limit and task.rate_limit > 0:
             rate_limiter = create_rate_limiter(task.rate_limit)
+            print(f"[Producer {task.task_id} PID:{pid}] 📊 速率限制: {task.rate_limit} msg/s", flush=True)
 
         # 4. 生成 payload
         payload = DriverUtils.create_test_payload(
@@ -375,17 +388,20 @@ async def _run_producer_async(
             task.payload_data
         )
 
-        # 5. 发送消息循环
-        print(f"[Producer {task.task_id} PID:{pid}] 📤 开始发送 {task.num_messages} 条消息", flush=True)
+        # 5. 持续发送消息直到收到停止信号 (Java OMB style)
+        print(f"[Producer {task.task_id} PID:{pid}] 📤 开始持续发送消息...", flush=True)
 
-        for i in range(task.num_messages):
+        message_counter = 0
+        while not stop_event.is_set():
+            message_counter += 1
+
             # 速率限制
             if rate_limiter:
                 await rate_limiter.acquire()
 
-            # 生成消息
+            # 生成消息 - 使用 counter 而不是固定的 num_messages
             key = DriverUtils.generate_message_key(
-                task.key_pattern, i, task.num_messages
+                task.key_pattern, message_counter, 0  # 0 means unlimited
             )
 
             send_timestamp_ms = int(time.time() * 1000)
@@ -407,9 +423,11 @@ async def _run_producer_async(
                 if errors <= 10:  # 只打印前 10 个错误
                     print(f"[Producer {task.task_id} PID:{pid}] ❌ 发送失败: {e}", flush=True)
 
-            # 进度日志
+            # 进度日志 (每10000条打印一次)
             if messages_sent > 0 and messages_sent % 10000 == 0:
-                print(f"[Producer {task.task_id} PID:{pid}] 📊 已发送 {messages_sent}/{task.num_messages}", flush=True)
+                elapsed = time.time() - start_time
+                rate = messages_sent / elapsed if elapsed > 0 else 0
+                print(f"[Producer {task.task_id} PID:{pid}] 📊 已发送 {messages_sent} 条 ({rate:.1f} msg/s)", flush=True)
 
         # 6. 刷新
         print(f"[Producer {task.task_id} PID:{pid}] 🔄 刷新...", flush=True)
@@ -482,16 +500,19 @@ async def _run_producer_async(
 
 async def _run_consumer_async(
     task: ConsumerTask,
-    driver_config: DriverConfig
+    driver_config: DriverConfig,
+    stop_event: mp.Event
 ) -> ProcessResult:
     """
-    异步运行 consumer 逻辑（在子进程中）
+    异步运行 consumer 逻辑（在子进程中）- Java OMB continuous mode
+
+    Runs continuously until stop_event is set by coordinator.
     """
     from benchmark.drivers.kafka import KafkaDriver
     from benchmark.utils.latency_recorder import EndToEndLatencyRecorder
 
     pid = mp.current_process().pid
-    print(f"[Consumer {task.task_id} PID:{pid}] 🚀 启动", flush=True)
+    print(f"[Consumer {task.task_id} PID:{pid}] 🚀 启动 (持续模式)", flush=True)
 
     start_time = time.time()
     messages_received = 0
@@ -517,15 +538,13 @@ async def _run_consumer_async(
         # 4. E2E 延迟追踪
         e2e_latency_recorder = EndToEndLatencyRecorder()
 
-        # 5. 消费消息
-        end_time = start_time + task.test_duration_seconds
+        # 5. 持续消费消息直到收到停止信号 (Java OMB style)
         print(
-            f"[Consumer {task.task_id} PID:{pid}] 🔄 开始消费 "
-            f"({task.test_duration_seconds}s)...",
+            f"[Consumer {task.task_id} PID:{pid}] 🔄 开始持续消费消息...",
             flush=True
         )
 
-        while time.time() < end_time:
+        while not stop_event.is_set():
             try:
                 async for consumed_message in consumer.consume_messages(timeout_seconds=1.0):
                     messages_received += 1
@@ -548,10 +567,12 @@ async def _run_consumer_async(
                             except:
                                 pass
 
-                    # 进度日志
+                    # 进度日志 (每10000条打印一次)
                     if messages_received % 10000 == 0:
+                        elapsed = time.time() - start_time
+                        rate = messages_received / elapsed if elapsed > 0 else 0
                         print(
-                            f"[Consumer {task.task_id} PID:{pid}] 📊 已消费 {messages_received}",
+                            f"[Consumer {task.task_id} PID:{pid}] 📊 已消费 {messages_received} 条 ({rate:.1f} msg/s)",
                             flush=True
                         )
 

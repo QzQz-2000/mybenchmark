@@ -222,12 +222,20 @@ class BenchmarkCoordinator(LoggerMixin):
         driver_config: DriverConfig,
         payload_data: Optional[bytes]
     ) -> None:
-        """Run main test phase with timeout protection."""
-        self.logger.info("Starting main test phase")
+        """Run main test phase - Java OMB style.
 
-        # Calculate timeout: test duration + warmup + buffer
+        Execution flow (matches Java OMB):
+        1. Start all consumers (non-blocking) - they run continuously
+        2. Wait for consumer subscription
+        3. Start all producers (non-blocking) - they run continuously
+        4. Wait for test duration
+        5. Send stop signal to all workers
+        6. Wait for graceful shutdown and collect results
+        """
+        self.logger.info("🚀 Starting main test phase (Java OMB style)")
+
+        # Calculate test duration
         test_duration_seconds = workload_config.test_duration_minutes * 60
-        timeout_seconds = test_duration_seconds + 180  # Add 3-minute buffer
 
         # Generate tasks
         producer_tasks = self._generate_producer_tasks(workload_config, payload_data)
@@ -237,89 +245,122 @@ class BenchmarkCoordinator(LoggerMixin):
         producer_task_groups = self._distribute_tasks(producer_tasks, len(self.config.workers))
         consumer_task_groups = self._distribute_tasks(consumer_tasks, len(self.config.workers))
 
-        # CRITICAL: Start consumer tasks first and wait for subscription
-        # This ensures consumers are ready BEFORE producers start sending
-        self.logger.info(f"📥 Starting consumer tasks on {len(self.config.workers)} workers...")
-        consumer_futures = []
+        # ========================================================================
+        # Phase 1: Start Consumers (non-blocking, run continuously)
+        # ========================================================================
+        self.logger.info(f"📥 Phase 1: Starting {len(consumer_tasks)} consumer tasks (continuous mode)...")
+        consumer_start_futures = []
         for i, worker_url in enumerate(self.config.workers):
             if i < len(consumer_task_groups) and consumer_task_groups[i]:
                 task_count = len(consumer_task_groups[i])
                 self.logger.info(f"  🚀 Worker {worker_url}: {task_count} consumer tasks")
+                # Start tasks asynchronously (don't wait for completion)
                 future = asyncio.create_task(
-                    self._run_worker_consumer_tasks(worker_url, consumer_task_groups[i])
+                    self._start_worker_consumer_tasks_nonblocking(worker_url, consumer_task_groups[i])
                 )
-                consumer_futures.append(future)
+                consumer_start_futures.append((worker_url, future))
 
-        # OPTIMIZATION: Wait longer for consumers to subscribe and receive partition assignment
-        # This prevents the timing issue where producer sends before consumer is ready
+        # Wait for consumer tasks to start
+        for worker_url, future in consumer_start_futures:
+            try:
+                await future
+                self.logger.info(f"  ✅ Consumer tasks started on {worker_url}")
+            except Exception as e:
+                self.logger.error(f"  ❌ Failed to start consumers on {worker_url}: {e}")
+
+        # Wait for consumers to subscribe and receive partition assignment
         self.logger.info("⏱️  Waiting for consumers to subscribe and receive partition assignment...")
-        await asyncio.sleep(5)  # Increased from 2s to 5s
-        self.logger.info("✅ Consumers should now be ready to receive messages")
+        await asyncio.sleep(5)
+        self.logger.info("✅ Consumers ready to receive messages")
 
-        # Start producer tasks AFTER consumers are ready
-        self.logger.info(f"📤 Starting producer tasks on {len(self.config.workers)} workers...")
-        producer_futures = []
+        # ========================================================================
+        # Phase 2: Start Producers (non-blocking, run continuously)
+        # ========================================================================
+        self.logger.info(f"📤 Phase 2: Starting {len(producer_tasks)} producer tasks (continuous mode)...")
+        producer_start_futures = []
         for i, worker_url in enumerate(self.config.workers):
             if i < len(producer_task_groups) and producer_task_groups[i]:
                 task_count = len(producer_task_groups[i])
                 self.logger.info(f"  🚀 Worker {worker_url}: {task_count} producer tasks")
+                # Start tasks asynchronously (don't wait for completion)
                 future = asyncio.create_task(
-                    self._run_worker_producer_tasks(worker_url, producer_task_groups[i])
+                    self._start_worker_producer_tasks_nonblocking(worker_url, producer_task_groups[i])
                 )
-                producer_futures.append(future)
+                producer_start_futures.append((worker_url, future))
 
-        # Wait for all tasks to complete WITH TIMEOUT
-        self.logger.info(f"⏳ Waiting for {len(producer_futures)} producer task groups (timeout: {timeout_seconds}s)...")
-        all_producer_results = []
-        try:
-            for i, future in enumerate(producer_futures):
-                try:
-                    self.logger.info(f"  ⏳ Waiting for producer task group {i+1}/{len(producer_futures)}...")
-                    # Add timeout for each task group
-                    results = await asyncio.wait_for(future, timeout=timeout_seconds)
-                    all_producer_results.extend(results)
-                    self.logger.info(f"  ✅ Producer task group {i+1}/{len(producer_futures)} completed with {len(results)} results")
-                except asyncio.TimeoutError:
-                    self.logger.error(f"❌ Producer task group {i+1} timed out after {timeout_seconds}s")
-                except Exception as e:
-                    import traceback
-                    self.logger.error(f"❌ Producer task group {i+1} failed: {e}")
-                    self.logger.error(f"Producer task traceback: {traceback.format_exc()}")
-        except Exception as e:
-            self.logger.error(f"❌ Producer tasks failed: {e}")
+        # Wait for producer tasks to start
+        for worker_url, future in producer_start_futures:
+            try:
+                await future
+                self.logger.info(f"  ✅ Producer tasks started on {worker_url}")
+            except Exception as e:
+                self.logger.error(f"  ❌ Failed to start producers on {worker_url}: {e}")
 
-        self.logger.info(f"⏳ Waiting for {len(consumer_futures)} consumer task groups (timeout: {timeout_seconds}s)...")
-        all_consumer_results = []
-        try:
-            for i, future in enumerate(consumer_futures):
-                try:
-                    self.logger.info(f"  ⏳ Waiting for consumer task group {i+1}/{len(consumer_futures)}...")
-                    # Add timeout for each task group
-                    results = await asyncio.wait_for(future, timeout=timeout_seconds)
-                    all_consumer_results.extend(results)
-                    self.logger.info(f"  ✅ Consumer task group {i+1}/{len(consumer_futures)} completed with {len(results)} results")
-                except asyncio.TimeoutError:
-                    self.logger.error(f"❌ Consumer task group {i+1} timed out after {timeout_seconds}s")
-                except Exception as e:
-                    self.logger.error(f"❌ Consumer task group {i+1} failed: {e}")
-        except Exception as e:
-            self.logger.error(f"❌ Consumer tasks failed: {e}")
+        # ========================================================================
+        # Phase 3: Run for test duration (Java OMB: sleep while tasks run)
+        # ========================================================================
+        self.logger.info(f"⏱️  Phase 3: Running test for {test_duration_seconds} seconds...")
+        self.logger.info(f"   All producers and consumers are running continuously...")
+        await asyncio.sleep(test_duration_seconds)
+
+        # ========================================================================
+        # Phase 4: Trigger stop signal (Java OMB: testCompleted = true)
+        # ========================================================================
+        self.logger.info("🛑 Phase 4: Triggering stop signal for all workers...")
+        stop_futures = []
+        for worker_url in self.config.workers:
+            future = asyncio.create_task(self._stop_worker_tasks(worker_url))
+            stop_futures.append((worker_url, future))
+
+        # Wait for stop signals to be sent
+        for worker_url, future in stop_futures:
+            try:
+                await future
+                self.logger.info(f"  ✅ Stop signal sent to {worker_url}")
+            except Exception as e:
+                self.logger.error(f"  ❌ Failed to send stop signal to {worker_url}: {e}")
+
+        # ========================================================================
+        # Phase 5: Wait for completion and collect results
+        # ========================================================================
+        self.logger.info("⏳ Phase 5: Waiting for graceful shutdown and collecting results...")
+        collection_futures = []
+        for worker_url in self.config.workers:
+            future = asyncio.create_task(self._collect_worker_results(worker_url))
+            collection_futures.append((worker_url, future))
+
+        # Collect all results
+        all_results = []
+        for worker_url, future in collection_futures:
+            try:
+                worker_results = await future
+                all_results.extend(worker_results)
+                self.logger.info(f"  ✅ Collected {len(worker_results)} results from {worker_url}")
+            except Exception as e:
+                self.logger.error(f"  ❌ Failed to collect results from {worker_url}: {e}")
 
         # Add results to benchmark result
-        for worker_result in all_producer_results:
+        for worker_result in all_results:
             self.result_collector.add_worker_result(result, worker_result)
 
-        for worker_result in all_consumer_results:
-            self.result_collector.add_worker_result(result, worker_result)
-
-        self.logger.info(f"Test phase completed. Producers: {len(all_producer_results)}, Consumers: {len(all_consumer_results)}")
+        # Statistics
+        producer_count = sum(1 for r in all_results if r.task_type == 'producer')
+        consumer_count = sum(1 for r in all_results if r.task_type == 'consumer')
+        self.logger.info(
+            f"✅ Test phase completed: "
+            f"{producer_count} producers, {consumer_count} consumers"
+        )
 
     def _generate_producer_tasks(
         self,
         workload_config: WorkloadConfig,
         payload_data: Optional[bytes]
     ) -> List[ProducerTask]:
-        """Generate producer tasks based on workload configuration."""
+        """Generate producer tasks - Java OMB continuous mode.
+
+        Producers run continuously at specified rate until stopped.
+        No fixed num_messages.
+        """
         tasks = []
         task_id = 0
 
@@ -327,18 +368,14 @@ class BenchmarkCoordinator(LoggerMixin):
             topic_name = self._current_test_topics[topic_idx]
 
             for producer_idx in range(workload_config.producers_per_topic):
-                # Calculate messages per producer
-                messages_per_producer = (
-                    workload_config.producer_rate *
-                    workload_config.test_duration_minutes * 60
-                ) // workload_config.producers_per_topic
+                # Rate limit per producer (total rate / num producers)
+                rate_per_producer = workload_config.producer_rate // workload_config.producers_per_topic
 
                 task = ProducerTask(
                     task_id=f"producer-{task_id}",
                     topic=topic_name,
-                    num_messages=messages_per_producer,
                     message_size=workload_config.message_size,
-                    rate_limit=workload_config.producer_rate // workload_config.producers_per_topic,
+                    rate_limit=rate_per_producer,  # Continuous mode with rate limit
                     payload_data=payload_data,
                     key_pattern=workload_config.key_distributor
                 )
@@ -348,7 +385,11 @@ class BenchmarkCoordinator(LoggerMixin):
         return tasks
 
     def _generate_consumer_tasks(self, workload_config: WorkloadConfig) -> List[ConsumerTask]:
-        """Generate consumer tasks based on workload configuration."""
+        """Generate consumer tasks - Java OMB continuous mode.
+
+        Consumers run continuously until stopped by coordinator.
+        No fixed test_duration.
+        """
         tasks = []
         task_id = 0
 
@@ -371,16 +412,11 @@ class BenchmarkCoordinator(LoggerMixin):
                     # Use unique subscription name per test to avoid offset conflicts
                     subscription_name = f"subscription-{sub_idx}{test_id_suffix}"
 
-                    # Consumer需要运行比Producer更长的时间才能接收所有消息
-                    # 额外时间包括：启动等待(5s) + producer运行时间 + 消息消费缓冲(60s)
-                    producer_duration = workload_config.test_duration_minutes * 60
-                    consumer_duration = producer_duration + 65  # 额外65秒确保接收完所有消息
-
                     task = ConsumerTask(
                         task_id=f"consumer-{task_id}",
                         topics=[topic_name],
-                        subscription_name=subscription_name,
-                        test_duration_seconds=consumer_duration
+                        subscription_name=subscription_name
+                        # No test_duration_seconds - runs until stop signal
                     )
                     tasks.append(task)
                     task_id += 1
@@ -414,7 +450,6 @@ class BenchmarkCoordinator(LoggerMixin):
             api_task = {
                 "task_id": task.task_id,
                 "topic": task.topic,
-                "num_messages": task.num_messages,
                 "message_size": task.message_size,
                 "rate_limit": task.rate_limit,
                 "key_pattern": task.key_pattern,
@@ -456,7 +491,6 @@ class BenchmarkCoordinator(LoggerMixin):
                 "task_id": task.task_id,
                 "topics": task.topics,
                 "subscription_name": task.subscription_name,
-                "test_duration_seconds": task.test_duration_seconds,
                 "properties": task.properties
             }
             api_tasks.append(api_task)
@@ -473,6 +507,119 @@ class BenchmarkCoordinator(LoggerMixin):
             worker_results.append(worker_result)
 
         return worker_results
+
+    async def _start_worker_producer_tasks_nonblocking(
+        self,
+        worker_url: str,
+        tasks: List[ProducerTask]
+    ) -> None:
+        """Start producer tasks on a worker (non-blocking, Java OMB style).
+
+        Tasks will run continuously until stop signal is sent.
+        This method returns immediately after sending the start request.
+        """
+        if not tasks:
+            return
+
+        # Convert tasks to API format
+        api_tasks = []
+        for task in tasks:
+            api_task = {
+                "task_id": task.task_id,
+                "topic": task.topic,
+                "message_size": task.message_size,
+                "rate_limit": task.rate_limit,
+                "key_pattern": task.key_pattern,
+                "properties": task.properties
+            }
+
+            if task.payload_data:
+                import base64
+                api_task["payload_data"] = base64.b64encode(task.payload_data).decode()
+
+            api_tasks.append(api_task)
+
+        # Send the start request (returns immediately)
+        url = f"{worker_url}/producer/start"
+        async with self._session.post(url, json=api_tasks) as response:
+            response.raise_for_status()
+            result = await response.json()
+            # Should get {"status": "started", ...}
+            if result.get("status") != "started":
+                self.logger.warning(f"Unexpected response from {worker_url}: {result}")
+
+    async def _start_worker_consumer_tasks_nonblocking(
+        self,
+        worker_url: str,
+        tasks: List[ConsumerTask]
+    ) -> None:
+        """Start consumer tasks on a worker (non-blocking, Java OMB style).
+
+        Tasks will run continuously until stop signal is sent.
+        This method returns immediately after sending the start request.
+        """
+        if not tasks:
+            return
+
+        # Convert tasks to API format
+        api_tasks = []
+        for task in tasks:
+            api_task = {
+                "task_id": task.task_id,
+                "topics": task.topics,
+                "subscription_name": task.subscription_name,
+                "properties": task.properties
+            }
+            api_tasks.append(api_task)
+
+        # Send the start request (returns immediately)
+        url = f"{worker_url}/consumer/start"
+        async with self._session.post(url, json=api_tasks) as response:
+            response.raise_for_status()
+            result = await response.json()
+            # Should get {"status": "started", ...}
+            if result.get("status") != "started":
+                self.logger.warning(f"Unexpected response from {worker_url}: {result}")
+
+    async def _stop_worker_tasks(self, worker_url: str) -> None:
+        """Send stop signal to a worker - Java OMB style.
+
+        Triggers stop_event for all running tasks on the worker.
+        """
+        url = f"{worker_url}/tasks/stop-all"
+        try:
+            async with self._session.post(url) as response:
+                response.raise_for_status()
+                result = await response.json()
+                if result.get("status") == "stop_signal_sent":
+                    self.logger.debug(f"Stop signal sent to {worker_url}")
+                else:
+                    self.logger.warning(f"Unexpected response from {worker_url}: {result}")
+        except Exception as e:
+            self.logger.error(f"Failed to send stop signal to {worker_url}: {e}")
+            raise
+
+    async def _collect_worker_results(self, worker_url: str) -> List[WorkerResult]:
+        """Wait for worker to complete all tasks and collect results.
+
+        Should be called after _stop_worker_tasks().
+        """
+        url = f"{worker_url}/tasks/wait-completion"
+        try:
+            async with self._session.post(url) as response:
+                response.raise_for_status()
+                result_data = await response.json()
+
+            # Convert API results back to WorkerResult objects
+            worker_results = []
+            for result_dict in result_data["results"]:
+                worker_result = self._deserialize_worker_result(result_dict, worker_url)
+                worker_results.append(worker_result)
+
+            return worker_results
+        except Exception as e:
+            self.logger.error(f"Failed to collect results from {worker_url}: {e}")
+            raise
 
     def _deserialize_worker_result(self, result_dict: Dict[str, Any], worker_url: str) -> WorkerResult:
         """Deserialize worker result from API response."""

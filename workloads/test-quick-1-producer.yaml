@@ -1,12 +1,12 @@
 name: "Quick 1 Producer Test"
 topics: 1
-partitionsPerTopic: 4
+partitionsPerTopic: 16
 messageSize: 1024
 keyDistributor: NO_KEY
 
 # 1 个 producer，独立进程
 producersPerTopic: 1
-producerRate: 1000  # 10k msg/s
+producerRate: 5000  # 10k msg/s
 
 # 1 个 consumer，独立进程
 subscriptionsPerTopic: 1

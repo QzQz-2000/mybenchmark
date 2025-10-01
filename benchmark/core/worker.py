@@ -13,12 +13,15 @@ from .monitoring import SystemMonitor
 
 @dataclass
 class ProducerTask:
-    """Producer task definition."""
+    """Producer task definition - continuous run mode (Java OMB style).
+
+    Producer runs continuously until stop signal is received.
+    No fixed num_messages - controlled by test duration and rate limit.
+    """
     task_id: str
     topic: str
-    num_messages: int
     message_size: int
-    rate_limit: int = 0  # 0 = unlimited
+    rate_limit: int = 0  # Messages per second, 0 = unlimited
     payload_data: Optional[bytes] = None
     key_pattern: str = "NO_KEY"
     properties: Dict[str, Any] = field(default_factory=dict)
@@ -26,11 +29,14 @@ class ProducerTask:
 
 @dataclass
 class ConsumerTask:
-    """Consumer task definition."""
+    """Consumer task definition - continuous run mode (Java OMB style).
+
+    Consumer runs continuously until stop signal is received.
+    No fixed test_duration - controlled by coordinator's stop signal.
+    """
     task_id: str
     topics: List[str]
     subscription_name: str
-    test_duration_seconds: int
     properties: Dict[str, Any] = field(default_factory=dict)
 
 

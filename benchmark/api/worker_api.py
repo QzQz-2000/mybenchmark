@@ -14,10 +14,9 @@ from ..utils.logging import setup_logging, LoggerMixin
 
 # API Models
 class ProducerTaskRequest(BaseModel):
-    """Producer task request model."""
+    """Producer task request model - Java OMB continuous mode."""
     task_id: str
     topic: str
-    num_messages: int = Field(ge=1)
     message_size: int = Field(ge=1)
     rate_limit: int = Field(default=0, ge=0)
     payload_data: Optional[str] = None  # Base64 encoded
@@ -26,11 +25,10 @@ class ProducerTaskRequest(BaseModel):
 
 
 class ConsumerTaskRequest(BaseModel):
-    """Consumer task request model."""
+    """Consumer task request model - Java OMB continuous mode."""
     task_id: str
     topics: List[str]
     subscription_name: str
-    test_duration_seconds: int = Field(ge=1)
     properties: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -78,7 +76,11 @@ class WorkerAPI(LoggerMixin):
             tasks: List[ProducerTaskRequest],
             background_tasks: BackgroundTasks
         ):
-            """Start producer tasks."""
+            """Start producer tasks (Java OMB style - non-blocking).
+
+            Tasks will run continuously until stop signal is sent.
+            This endpoint returns immediately after starting tasks.
+            """
             try:
                 # Convert API models to internal models
                 producer_tasks = []
@@ -91,7 +93,6 @@ class WorkerAPI(LoggerMixin):
                     producer_task = ProducerTask(
                         task_id=task_req.task_id,
                         topic=task_req.topic,
-                        num_messages=task_req.num_messages,
                         message_size=task_req.message_size,
                         rate_limit=task_req.rate_limit,
                         payload_data=payload_data,
@@ -100,14 +101,14 @@ class WorkerAPI(LoggerMixin):
                     )
                     producer_tasks.append(producer_task)
 
-                # Start tasks asynchronously
-                results = await self.worker.run_producer_tasks(producer_tasks)
+                # Start tasks (returns immediately, tasks run continuously)
+                await self.worker.run_producer_tasks(producer_tasks)
 
-                # Convert results for JSON response
+                # Return success status immediately
                 return {
-                    "status": "completed",
-                    "tasks_count": len(results),
-                    "results": [self._serialize_result(r) for r in results]
+                    "status": "started",
+                    "tasks_count": len(producer_tasks),
+                    "message": "Producer tasks started successfully"
                 }
 
             except Exception as e:
@@ -119,7 +120,11 @@ class WorkerAPI(LoggerMixin):
             tasks: List[ConsumerTaskRequest],
             background_tasks: BackgroundTasks
         ):
-            """Start consumer tasks."""
+            """Start consumer tasks (Java OMB style - non-blocking).
+
+            Tasks will run continuously until stop signal is sent.
+            This endpoint returns immediately after starting tasks.
+            """
             try:
                 # Convert API models to internal models
                 consumer_tasks = []
@@ -128,19 +133,18 @@ class WorkerAPI(LoggerMixin):
                         task_id=task_req.task_id,
                         topics=task_req.topics,
                         subscription_name=task_req.subscription_name,
-                        test_duration_seconds=task_req.test_duration_seconds,
                         properties=task_req.properties
                     )
                     consumer_tasks.append(consumer_task)
 
-                # Start tasks asynchronously
-                results = await self.worker.run_consumer_tasks(consumer_tasks)
+                # Start tasks (returns immediately, tasks run continuously)
+                await self.worker.run_consumer_tasks(consumer_tasks)
 
-                # Convert results for JSON response
+                # Return success status immediately
                 return {
-                    "status": "completed",
-                    "tasks_count": len(results),
-                    "results": [self._serialize_result(r) for r in results]
+                    "status": "started",
+                    "tasks_count": len(consumer_tasks),
+                    "message": "Consumer tasks started successfully"
                 }
 
             except Exception as e:
@@ -183,6 +187,45 @@ class WorkerAPI(LoggerMixin):
                 return {"status": "reset_completed"}
             except Exception as e:
                 self.logger.error(f"Failed to reset worker: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.post("/tasks/stop-all")
+        async def stop_all_tasks():
+            """Stop all running tasks - Java OMB style.
+
+            Triggers stop signal for all producer and consumer processes.
+            """
+            try:
+                # Check if worker has stop_all_tasks method (multiprocess worker)
+                if hasattr(self.worker, 'stop_all_tasks'):
+                    await self.worker.stop_all_tasks()
+                    return {"status": "stop_signal_sent", "message": "Stop signal sent to all tasks"}
+                else:
+                    return {"status": "not_supported", "message": "Worker does not support stop-all operation"}
+            except Exception as e:
+                self.logger.error(f"Failed to stop all tasks: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.post("/tasks/wait-completion")
+        async def wait_for_completion():
+            """Wait for all tasks to complete and collect results.
+
+            Should be called after /tasks/stop-all.
+            Returns results from all processes.
+            """
+            try:
+                # Check if worker has wait_for_completion method (multiprocess worker)
+                if hasattr(self.worker, 'wait_for_completion'):
+                    results = await self.worker.wait_for_completion()
+                    return {
+                        "status": "completed",
+                        "tasks_count": len(results),
+                        "results": [self._serialize_result(r) for r in results]
+                    }
+                else:
+                    return {"status": "not_supported", "message": "Worker does not support wait-completion operation"}
+            except Exception as e:
+                self.logger.error(f"Failed to wait for completion: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
         @self.app.on_event("startup")

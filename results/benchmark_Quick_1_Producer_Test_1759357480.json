@@ -1,0 +1,210 @@
+{
+  "test_id": "Quick_1_Producer_Test_1759357480",
+  "test_name": "Quick 1 Producer Test",
+  "start_time": 1759357480.5787678,
+  "end_time": 1759357547.244753,
+  "workload_config": {
+    "name": "Quick 1 Producer Test",
+    "topics": 1,
+    "partitions_per_topic": 4,
+    "key_distributor": "NO_KEY",
+    "message_size": 1024,
+    "payload_file": null,
+    "producers_per_topic": 1,
+    "producer_rate": 1000,
+    "subscriptions_per_topic": 1,
+    "consumer_per_subscription": 1,
+    "consumer_backlog_size_gb": 0,
+    "test_duration_minutes": 1,
+    "warmup_duration_minutes": 0
+  },
+  "driver_config": {
+    "name": "Kafka Digital Twin Driver",
+    "driver_class": "benchmark.drivers.kafka.KafkaDriver",
+    "common_config": {
+      "bootstrap.servers": "localhost:9092",
+      "default.api.timeout.ms": 300000,
+      "request.timeout.ms": 120000,
+      "socket.keepalive.enable": true,
+      "socket.send.buffer.bytes": 131072,
+      "socket.receive.buffer.bytes": 131072
+    },
+    "producer_config": {
+      "acks": "all",
+      "enable.idempotence": true,
+      "retries": 2147483647,
+      "delivery.timeout.ms": 300000,
+      "retry.backoff.ms": 100,
+      "batch.size": 65536,
+      "linger.ms": 5,
+      "compression.type": "lz4",
+      "buffer.memory": 67108864,
+      "max.request.size": 2097152,
+      "connections.max.idle.ms": 300000,
+      "max.in.flight.requests.per.connection": 5,
+      "client.id": "digital-twin-producer"
+    },
+    "consumer_config": {
+      "auto.offset.reset": "earliest",
+      "enable.auto.commit": false,
+      "fetch.min.bytes": 1,
+      "fetch.max.bytes": 52428800,
+      "max.partition.fetch.bytes": 1048576,
+      "session.timeout.ms": 30000,
+      "heartbeat.interval.ms": 3000,
+      "max.poll.interval.ms": 300000,
+      "connections.max.idle.ms": 300000,
+      "client.id": "digital-twin-consumer"
+    },
+    "topic_config": {
+      "min.insync.replicas": 1,
+      "cleanup.policy": "delete",
+      "retention.ms": 86400000,
+      "segment.ms": 3600000,
+      "compression.type": "lz4",
+      "segment.bytes": 268435456,
+      "max.message.bytes": 2097152
+    },
+    "replication_factor": 1,
+    "reset": true
+  },
+  "producer_results": [
+    {
+      "worker_id": "worker-1-process-82175",
+      "worker_url": "http://localhost:8001",
+      "task_type": "producer",
+      "start_time": 1759357491.841581,
+      "end_time": 1759357546.0844648,
+      "throughput": {
+        "total_messages": 43683,
+        "total_bytes": 44731392,
+        "duration_seconds": 54.24288368225098,
+        "messages_per_second": 805.3222291036434,
+        "bytes_per_second": 824649.9626021308,
+        "mb_per_second": 0.7864474893590268
+      },
+      "latency": {
+        "count": 43683,
+        "min_ms": 1.107931137084961,
+        "max_ms": 517.6510810852051,
+        "mean_ms": 24.614244792945133,
+        "median_ms": 13.559,
+        "p50_ms": 13.559,
+        "p95_ms": 65.599,
+        "p99_ms": 128.639,
+        "p99_9_ms": 422.655,
+        "histogram_data": null
+      },
+      "errors": {
+        "total_errors": 0,
+        "error_rate": 0.0,
+        "error_types": {}
+      },
+      "metadata": {
+        "task_id": "producer-0",
+        "pid": 82175,
+        "success": true,
+        "error_message": null
+      }
+    }
+  ],
+  "consumer_results": [
+    {
+      "worker_id": "worker-1-process-82164",
+      "worker_url": "http://localhost:8001",
+      "task_type": "consumer",
+      "start_time": 1759357489.169836,
+      "end_time": 1759357546.692943,
+      "throughput": {
+        "total_messages": 43683,
+        "total_bytes": 44731392,
+        "duration_seconds": 57.523107051849365,
+        "messages_per_second": 759.3991743287726,
+        "bytes_per_second": 777624.7545126631,
+        "mb_per_second": 0.741600756180442
+      },
+      "latency": {
+        "count": 43683,
+        "min_ms": 12.115966796875,
+        "max_ms": 1290.237060546875,
+        "mean_ms": 565.3506365116024,
+        "median_ms": 569.343,
+        "p50_ms": 569.343,
+        "p95_ms": 1015.295,
+        "p99_ms": 1076.223,
+        "p99_9_ms": 1213.439,
+        "histogram_data": null
+      },
+      "errors": {
+        "total_errors": 0,
+        "error_rate": 0.0,
+        "error_types": {}
+      },
+      "metadata": {
+        "task_id": "consumer-0",
+        "pid": 82164,
+        "success": true,
+        "error_message": null
+      }
+    }
+  ],
+  "producer_stats": {
+    "total_messages": 43683,
+    "total_bytes": 44731392,
+    "duration_seconds": 54.24288368225098,
+    "messages_per_second": 805.3222291036434,
+    "bytes_per_second": 824649.9626021308,
+    "mb_per_second": 0.7864474893590268
+  },
+  "consumer_stats": {
+    "total_messages": 43683,
+    "total_bytes": 44731392,
+    "duration_seconds": 57.523107051849365,
+    "messages_per_second": 759.3991743287726,
+    "bytes_per_second": 777624.7545126631,
+    "mb_per_second": 0.741600756180442
+  },
+  "latency_stats": {
+    "count": 43683,
+    "min_ms": 1.107931137084961,
+    "max_ms": 517.6510810852051,
+    "mean_ms": 24.614244792945133,
+    "median_ms": 13.559000000000001,
+    "p50_ms": 13.559000000000001,
+    "p95_ms": 65.599,
+    "p99_ms": 128.639,
+    "p99_9_ms": 422.655,
+    "histogram_data": null
+  },
+  "system_stats": {
+    "cpu": {
+      "avg": 59.346969696969694,
+      "max": 76.0,
+      "min": 47.1,
+      "p95": 64.175,
+      "p99": 69.17499999999994
+    },
+    "memory": {
+      "avg": 62.06363636363638,
+      "max": 63.8,
+      "min": 61.1
+    },
+    "network": {
+      "avg_sent_mbps": 0.18880208333333334,
+      "avg_recv_mbps": 0.18877249053030304,
+      "max_sent_mbps": 0.2802734375,
+      "max_recv_mbps": 0.2802734375,
+      "total_sent_mb": 12.4609375,
+      "total_recv_mb": 12.458984375
+    },
+    "disk": {
+      "avg_read_mbps": 5.005385890151516,
+      "avg_write_mbps": 3.3960700757575757,
+      "max_read_mbps": 107.71875,
+      "max_write_mbps": 214.40234375,
+      "total_read_mb": 330.35546875,
+      "total_write_mb": 224.140625
+    }
+  },
+  "metadata": {}
+}
