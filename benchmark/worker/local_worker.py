@@ -592,9 +592,10 @@ class LocalWorker(Worker):
         Callback when message is received (ConsumerCallback interface).
 
         :param payload: Message payload
-        :param publish_timestamp: Publish timestamp in microseconds
+        :param publish_timestamp: Publish timestamp in microseconds (from epoch)
         """
         import time
-        receive_timestamp = time.perf_counter_ns() // 1000  # Convert to microseconds
+        # IMPORTANT: Use epoch time (not perf_counter) to match Kafka timestamp
+        receive_timestamp = int(time.time() * 1_000_000)  # Convert to microseconds from epoch
         end_to_end_latency = receive_timestamp - publish_timestamp if publish_timestamp > 0 else 0
         self.stats.record_message_received(len(payload), end_to_end_latency)
