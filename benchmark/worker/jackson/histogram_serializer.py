@@ -11,7 +11,6 @@
 # limitations under the License.
 
 import base64
-import threading
 from typing import Any
 from hdrh.histogram import HdrHistogram
 
@@ -23,25 +22,26 @@ class HistogramSerializer:
     """
 
     def __init__(self):
-        # Thread-local buffer (8 MB initial size)
-        self._thread_local = threading.local()
+        # Process-local buffer (8 MB initial size)
+        # Each process gets its own independent buffer
+        self._buffer = None
 
     def _get_buffer(self) -> bytearray:
-        """Get thread-local buffer, create if doesn't exist."""
-        if not hasattr(self._thread_local, 'buffer'):
-            self._thread_local.buffer = bytearray(8 * 1024 * 1024)
-        return self._thread_local.buffer
+        """Get process-local buffer, create if doesn't exist."""
+        if self._buffer is None:
+            self._buffer = bytearray(8 * 1024 * 1024)
+        return self._buffer
 
     @staticmethod
     def serialize_histogram(histo: HdrHistogram) -> bytes:
         """
-        Serialize histogram to compressed byte array.
+        Serialize histogram to compressed byte array (raw binary).
 
         :param histo: The histogram to serialize
-        :return: Compressed byte array
+        :return: Compressed byte array (raw binary format)
         """
-        # Use HdrHistogram's built-in encoding to compressed format
-        # This returns a base64-encoded compressed representation
+        # Python's histo.encode() returns base64 string
+        # Decode to get raw compressed bytes (equivalent to Java's encodeIntoCompressedByteBuffer)
         encoded = histo.encode()
         return base64.b64decode(encoded)
 
@@ -52,8 +52,9 @@ class HistogramSerializer:
         :param histogram: The histogram to serialize
         :return: Base64-encoded string
         """
-        compressed_bytes = self.serialize_histogram(histogram)
-        return base64.b64encode(compressed_bytes).decode('ascii')
+        # Direct encoding without unnecessary decode/encode cycle
+        # histo.encode() already returns base64 string, use it directly!
+        return histogram.encode()
 
     def __call__(self, histogram: HdrHistogram) -> str:
         """Allow serializer to be called as a function."""

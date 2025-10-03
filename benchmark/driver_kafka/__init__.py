@@ -14,12 +14,10 @@ from .config import Config
 from .kafka_benchmark_driver import KafkaBenchmarkDriver
 from .kafka_benchmark_producer import KafkaBenchmarkProducer
 from .kafka_benchmark_consumer import KafkaBenchmarkConsumer
-from .kafka_topic_creator import KafkaTopicCreator
 
 __all__ = [
     'Config',
     'KafkaBenchmarkDriver',
     'KafkaBenchmarkProducer',
-    'KafkaBenchmarkConsumer',
-    'KafkaTopicCreator'
+    'KafkaBenchmarkConsumer'
 ]

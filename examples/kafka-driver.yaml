@@ -8,7 +8,7 @@ replicationFactor: 1
 commonConfig: |
   bootstrap.servers=localhost:9092
 
-# Producer-specific configuration
+# Producer-specific configuration (confluent-kafka uses librdkafka parameters)
 producerConfig: |
   acks=1
   linger.ms=10
@@ -16,13 +16,16 @@ producerConfig: |
   request.timeout.ms=30000
   delivery.timeout.ms=120000
   max.in.flight.requests.per.connection=5
-  buffer.memory=33554432
+  queue.buffering.max.kbytes=32768
 
 # Consumer-specific configuration
 consumerConfig: |
   auto.offset.reset=earliest
   enable.auto.commit=false
+  session.timeout.ms=300000
+  max.poll.interval.ms=300000
 
 # Topic configuration
 topicConfig: |
   min.insync.replicas=1
+  message.timestamp.type=CreateTime

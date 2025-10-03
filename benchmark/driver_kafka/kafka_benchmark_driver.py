@@ -12,11 +12,9 @@
 
 import yaml
 import os
-from io import StringIO
 from typing import List
 from concurrent.futures import Future
-from kafka import KafkaProducer, KafkaConsumer
-from kafka.admin import KafkaAdminClient
+from confluent_kafka.admin import AdminClient, NewTopic
 from benchmark.driver.benchmark_driver import BenchmarkDriver, TopicInfo
 from benchmark.driver.benchmark_producer import BenchmarkProducer
 from benchmark.driver.benchmark_consumer import BenchmarkConsumer
@@ -24,11 +22,10 @@ from benchmark.driver.consumer_callback import ConsumerCallback
 from .config import Config
 from .kafka_benchmark_producer import KafkaBenchmarkProducer
 from .kafka_benchmark_consumer import KafkaBenchmarkConsumer
-from .kafka_topic_creator import KafkaTopicCreator
 
 
 class KafkaBenchmarkDriver(BenchmarkDriver):
-    """Kafka implementation of BenchmarkDriver."""
+    """Kafka implementation of BenchmarkDriver using confluent-kafka."""
 
     ZONE_ID_CONFIG = "zone.id"
     ZONE_ID_TEMPLATE = "{zone.id}"
@@ -42,6 +39,7 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
         self.producer_properties = {}
         self.consumer_properties = {}
         self.admin = None
+        self.created_topics = []  # Track created topics for cleanup
 
     def initialize(self, configuration_file: str, stats_logger):
         """Initialize Kafka driver."""
@@ -66,109 +64,215 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
                 zone_id
             )
 
-        # Parse producer config
+        # Parse producer config (confluent-kafka uses dots in config names)
         self.producer_properties = dict(common_properties)
-        self.producer_properties.update(self._parse_properties(self.config.producer_config))
-        self.producer_properties['key_serializer'] = lambda k: k.encode('utf-8') if k else None
-        self.producer_properties['value_serializer'] = lambda v: v
+        producer_props = self._parse_properties_confluent(self.config.producer_config)
+        self.producer_properties.update(producer_props)
 
-        # Parse consumer config
+        # Parse consumer config (confluent-kafka uses dots in config names)
         self.consumer_properties = dict(common_properties)
-        self.consumer_properties.update(self._parse_properties(self.config.consumer_config))
-        self.consumer_properties['key_deserializer'] = lambda k: k.decode('utf-8') if k else None
-        self.consumer_properties['value_deserializer'] = lambda v: v
+        consumer_props = self._parse_properties_confluent(self.config.consumer_config)
+        self.consumer_properties.update(consumer_props)
 
         # Parse topic config
-        self.topic_properties = self._parse_properties(self.config.topic_config)
+        self.topic_properties = self._parse_properties_confluent(self.config.topic_config)
 
         # Create admin client
-        self.admin = KafkaAdminClient(**common_properties)
+        self.admin = AdminClient(common_properties)
 
     def get_topic_name_prefix(self) -> str:
         """Get topic name prefix."""
         return "test-topic"
 
+    def get_producer_properties(self) -> dict:
+        """Get producer properties."""
+        return self.producer_properties.copy()
+
+    def get_consumer_properties(self) -> dict:
+        """Get consumer properties."""
+        return self.consumer_properties.copy()
+
     def create_topic(self, topic: str, partitions: int) -> Future:
         """Create a single topic."""
-        return self.create_topics([TopicInfo(topic, partitions)])
+        topic_info = TopicInfo(topic, partitions)
+        return self.create_topics([topic_info])
 
     def create_topics(self, topic_infos: List[TopicInfo]) -> Future:
-        """Create multiple topics."""
-        topic_creator = KafkaTopicCreator(
-            self.admin,
-            self.topic_properties,
-            self.config.replication_factor
-        )
-        return topic_creator.create(topic_infos)
+        """Create multiple topics - synchronous execution."""
+        import concurrent.futures
+
+        future = concurrent.futures.Future()
+
+        try:
+            new_topics = [
+                NewTopic(
+                    topic_info.topic,
+                    num_partitions=topic_info.partitions,
+                    replication_factor=self.config.replication_factor,
+                    config=self.topic_properties
+                )
+                for topic_info in topic_infos
+            ]
+
+            # Create topics
+            fs = self.admin.create_topics(new_topics)
+
+            # Wait for all topics to be created
+            for topic, f in fs.items():
+                try:
+                    f.result()  # Block until topic is created
+                    # Track created topic for cleanup
+                    self.created_topics.append(topic)
+                except Exception as e:
+                    # Topic might already exist, which is fine
+                    if "already exists" not in str(e):
+                        raise
+                    else:
+                        # Still track it if it already exists
+                        self.created_topics.append(topic)
+
+            future.set_result(None)
+        except Exception as e:
+            future.set_exception(e)
+
+        return future
 
     def create_producer(self, topic: str) -> Future:
-        """Create a producer."""
-        future = Future()
+        """Create a single producer - synchronous execution."""
+        import concurrent.futures
+
+        future = concurrent.futures.Future()
 
         try:
-            kafka_producer = KafkaProducer(**self.producer_properties)
-            benchmark_producer = KafkaBenchmarkProducer(kafka_producer, topic)
-            self.producers.append(benchmark_producer)
-            future.set_result(benchmark_producer)
+            producer = KafkaBenchmarkProducer(
+                topic,
+                self.producer_properties.copy()
+            )
+            self.producers.append(producer)
+            future.set_result(producer)
         except Exception as e:
             future.set_exception(e)
 
         return future
 
-    def create_consumer(
-        self,
-        topic: str,
-        subscription_name: str,
-        consumer_callback: ConsumerCallback
-    ) -> Future:
-        """Create a consumer."""
-        future = Future()
+    def create_producers(self, producer_infos: List) -> Future:
+        """Create producers - synchronous execution."""
+        import concurrent.futures
+
+        future = concurrent.futures.Future()
 
         try:
-            properties = dict(self.consumer_properties)
-            properties['group_id'] = subscription_name
+            producers = []
+            for info in producer_infos:
+                producer = KafkaBenchmarkProducer(
+                    info.topic,
+                    self.producer_properties.copy()
+                )
+                producers.append(producer)
 
-            consumer = KafkaConsumer(topic, **properties)
-            benchmark_consumer = KafkaBenchmarkConsumer(
-                consumer,
-                self.consumer_properties,
+            self.producers.extend(producers)
+            future.set_result(producers)
+        except Exception as e:
+            future.set_exception(e)
+
+        return future
+
+    def create_consumer(self, topic: str, subscription_name: str, consumer_callback) -> Future:
+        """Create a single consumer - synchronous execution."""
+        import concurrent.futures
+
+        future = concurrent.futures.Future()
+
+        try:
+            consumer = KafkaBenchmarkConsumer(
+                topic,
+                subscription_name,
+                self.consumer_properties.copy(),
                 consumer_callback
             )
-            self.consumers.append(benchmark_consumer)
-            future.set_result(benchmark_consumer)
+            self.consumers.append(consumer)
+            future.set_result(consumer)
         except Exception as e:
             future.set_exception(e)
 
         return future
 
+    def create_consumers(self, consumer_infos: List) -> Future:
+        """Create consumers - synchronous execution."""
+        import concurrent.futures
+
+        future = concurrent.futures.Future()
+
+        try:
+            consumers = []
+            for info in consumer_infos:
+                consumer = KafkaBenchmarkConsumer(
+                    info.topic,
+                    info.subscription_name,
+                    self.consumer_properties.copy(),
+                    info.consumer_callback
+                )
+                consumers.append(consumer)
+
+            self.consumers.extend(consumers)
+            future.set_result(consumers)
+        except Exception as e:
+            future.set_exception(e)
+
+        return future
+
+    def delete_topics(self):
+        """Delete all created topics."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        if not self.created_topics:
+            return
+
+        try:
+            logger.info(f"Deleting {len(self.created_topics)} topics: {self.created_topics}")
+            fs = self.admin.delete_topics(self.created_topics, operation_timeout=30)
+
+            # Wait for deletion to complete
+            for topic, f in fs.items():
+                try:
+                    f.result()
+                    logger.info(f"Successfully deleted topic: {topic}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete topic {topic}: {e}")
+
+            self.created_topics.clear()
+        except Exception as e:
+            logger.error(f"Error deleting topics: {e}")
+
     def close(self):
-        """Close the driver."""
+        """Close all resources and cleanup topics."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Stop all producers
         for producer in self.producers:
             try:
                 producer.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Error closing producer: {e}")
 
+        # Stop all consumers
         for consumer in self.consumers:
             try:
                 consumer.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Error closing consumer: {e}")
 
-        if self.admin:
-            try:
-                self.admin.close()
-            except Exception:
-                pass
+        self.producers.clear()
+        self.consumers.clear()
+
+        # Delete created topics for idempotency
+        self.delete_topics()
 
     @staticmethod
-    def _parse_properties(config_str: str) -> dict:
-        """
-        Parse properties from string.
-
-        :param config_str: Properties string
-        :return: Dictionary of properties
-        """
+    def _parse_properties_confluent(config_str: str) -> dict:
+        """Parse properties for confluent-kafka (keeps dots in keys)."""
         properties = {}
         if not config_str:
             return properties
@@ -178,35 +282,32 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
             if line and not line.startswith('#'):
                 if '=' in line:
                     key, value = line.split('=', 1)
-                    # Convert Java-style dot notation to Python-style underscore
-                    key = key.strip().replace('.', '_')
+                    key = key.strip()
                     value = value.strip()
 
                     # Try to convert to appropriate type
-                    # First try int, then float, then bool, otherwise keep as string
                     try:
                         value = int(value)
                     except ValueError:
                         try:
                             value = float(value)
                         except ValueError:
-                            # Handle boolean values
                             if value.lower() == 'true':
                                 value = True
                             elif value.lower() == 'false':
                                 value = False
 
                     properties[key] = value
-
         return properties
 
     @staticmethod
-    def _apply_zone_id(client_id: str, zone_id: str) -> str:
-        """
-        Replace zone ID template in client ID.
+    def _parse_properties(config_str: str) -> dict:
+        """Parse properties (legacy method, keeps for compatibility)."""
+        return KafkaBenchmarkDriver._parse_properties_confluent(config_str)
 
-        :param client_id: Client ID with template
-        :param zone_id: Zone ID value
-        :return: Client ID with zone ID applied
-        """
-        return client_id.replace(KafkaBenchmarkDriver.ZONE_ID_TEMPLATE, zone_id)
+    @staticmethod
+    def _apply_zone_id(template: str, zone_id: str) -> str:
+        """Apply zone ID to template string."""
+        if not zone_id:
+            return template
+        return template.replace(KafkaBenchmarkDriver.ZONE_ID_TEMPLATE, zone_id)

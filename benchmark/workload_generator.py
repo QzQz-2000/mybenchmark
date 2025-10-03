@@ -37,7 +37,7 @@ class WorkloadGenerator:
         self.workload = workload
         self.worker = worker
 
-        self.executor = ThreadPoolExecutor(thread_name_prefix="messaging-benchmark")
+        self.executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="workload-gen")
 
         self.run_completed = False
         self.need_to_wait_for_backlog_draining = False

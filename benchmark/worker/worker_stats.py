@@ -18,7 +18,7 @@ from .commands.period_stats import PeriodStats
 
 
 class LongAdder:
-    """Thread-safe long adder (equivalent to Java's LongAdder)."""
+    """Thread-safe long adder."""
 
     def __init__(self):
         self._value = 0
@@ -78,7 +78,9 @@ class WorkerStats:
         # Cumulative totals
         self.total_messages_sent = LongAdder()
         self.total_message_send_errors = LongAdder()
+        self.total_bytes_sent = LongAdder()
         self.total_messages_received = LongAdder()
+        self.total_bytes_received = LongAdder()
 
         # Publish latency recorders
         self.publish_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
@@ -87,6 +89,9 @@ class WorkerStats:
         # Publish delay latency recorders
         self.publish_delay_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
         self.cumulative_publish_delay_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+
+        # Lock for histogram operations
+        self.histogram_lock = threading.Lock()
 
     def get_stats_logger(self):
         """Get the stats logger."""
@@ -106,10 +111,12 @@ class WorkerStats:
         self.messages_received.increment()
         self.total_messages_received.increment()
         self.bytes_received.add(payload_length)
+        self.total_bytes_received.add(payload_length)
 
         if end_to_end_latency_micros > 0:
-            self.end_to_end_cumulative_latency_recorder.record_value(end_to_end_latency_micros)
-            self.end_to_end_latency_recorder.record_value(end_to_end_latency_micros)
+            with self.histogram_lock:
+                self.end_to_end_cumulative_latency_recorder.record_value(end_to_end_latency_micros)
+                self.end_to_end_latency_recorder.record_value(end_to_end_latency_micros)
 
     def to_period_stats(self) -> PeriodStats:
         """
@@ -180,7 +187,10 @@ class WorkerStats:
         self.messages_received.reset()
         self.bytes_received.reset()
         self.total_messages_sent.reset()
+        self.total_message_send_errors.reset()
+        self.total_bytes_sent.reset()
         self.total_messages_received.reset()
+        self.total_bytes_received.reset()
 
     def record_producer_failure(self):
         """Record a producer failure."""
@@ -200,31 +210,31 @@ class WorkerStats:
         self.messages_sent.increment()
         self.total_messages_sent.increment()
         self.bytes_sent.add(payload_length)
+        self.total_bytes_sent.add(payload_length)
 
         # Calculate latency in microseconds
         latency_micros = min(self.HIGHEST_TRACKABLE_VALUE, (now_ns - send_time_ns) // 1000)
-        self.publish_latency_recorder.record_value(latency_micros)
-        self.cumulative_publish_latency_recorder.record_value(latency_micros)
-
-        # Calculate send delay in microseconds
         send_delay_micros = min(self.HIGHEST_TRACKABLE_VALUE, (send_time_ns - intended_send_time_ns) // 1000)
-        self.publish_delay_latency_recorder.record_value(send_delay_micros)
-        self.cumulative_publish_delay_latency_recorder.record_value(send_delay_micros)
 
-    @staticmethod
-    def _get_interval_histogram(recorder: HdrHistogram) -> HdrHistogram:
+        with self.histogram_lock:
+            self.publish_latency_recorder.record_value(latency_micros)
+            self.cumulative_publish_latency_recorder.record_value(latency_micros)
+            self.publish_delay_latency_recorder.record_value(send_delay_micros)
+            self.cumulative_publish_delay_latency_recorder.record_value(send_delay_micros)
+
+    def _get_interval_histogram(self, recorder: HdrHistogram) -> HdrHistogram:
         """
         Get interval histogram (simulates Java Recorder.getIntervalHistogram()).
 
         :param recorder: The recorder
         :return: A copy of the current histogram
         """
-        # Use encode/decode for thread-safe copy
-        # This creates a snapshot of the current histogram state
-        encoded = recorder.encode()
-        copy = HdrHistogram.decode(encoded)
+        with self.histogram_lock:
+            # Use encode/decode for thread-safe copy
+            encoded = recorder.encode()
+            copy = HdrHistogram.decode(encoded)
 
-        # Reset the original recorder for next interval
-        recorder.reset()
+            # Reset the original recorder for next interval
+            recorder.reset()
 
         return copy

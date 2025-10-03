@@ -56,7 +56,7 @@ class KafkaTopicCreator:
         :return: Future that completes when all topics are created
         """
         future = Future()
-        thread = threading.Thread(target=self._create_blocking_wrapper, args=(topic_infos, future))
+        thread = threading.Thread(target=self._create_blocking_wrapper, args=(topic_infos, future), daemon=True)
         thread.start()
         return future
 

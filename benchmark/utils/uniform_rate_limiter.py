@@ -19,7 +19,7 @@ from typing import Callable, Optional
 class UniformRateLimiter:
     """
     Provides a next operation time for rate limited operation streams.
-    The rate limiter is thread safe and can be shared by all threads.
+    Each process/thread creates its own instance for independent rate limiting.
     """
 
     ONE_SEC_IN_NS = 1_000_000_000  # 1 second in nanoseconds
@@ -46,31 +46,31 @@ class UniformRateLimiter:
         return self.interval_ns
 
     def acquire(self) -> int:
-        # Atomically increment virtual_time
+        """
+        Acquire the next send time for rate-limited operation.
+        Thread-safe implementation matching Java's AtomicLongFieldUpdater behavior.
+
+        :return: Intended send time in nanoseconds
+        """
         with self._lock:
+            # Atomically increment virtual time and get current operation index
             curr_op_index = self._virtual_time
             self._virtual_time += 1
 
-        # Initialize start time if needed (lazy initialization with double-checked locking)
-        start = self._start
-        if start is None:
-            with self._start_lock:
-                start = self._start
-                if start is None:
-                    start = self.nano_clock()
-                    self._start = start
+            # Initialize start time on first call (CAS equivalent)
+            if self._start is None:
+                self._start = self.nano_clock()
 
-        return start + curr_op_index * self.interval_ns
+        # Calculate next send time: start + (operation_index * interval)
+        # This matches Java: start + currOpIndex * intervalNs
+        return self._start + curr_op_index * self.interval_ns
 
     @staticmethod
     def uninterruptible_sleep_ns(intended_time: int):
         """
         Sleep until the intended time in nanoseconds.
-        This is uninterruptible and will continue sleeping even if interrupted.
         """
-        while True:
-            sleep_ns = intended_time - time.perf_counter_ns()
-            if sleep_ns <= 0:
-                break
+        sleep_ns = intended_time - time.perf_counter_ns()
+        if sleep_ns > 0:
             # Convert nanoseconds to seconds for time.sleep
             time.sleep(sleep_ns / 1_000_000_000)

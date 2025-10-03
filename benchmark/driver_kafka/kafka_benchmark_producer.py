@@ -10,54 +10,93 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
-from concurrent.futures import Future
-from kafka import KafkaProducer
+from confluent_kafka import Producer
 from benchmark.driver.benchmark_producer import BenchmarkProducer
 
 
 class KafkaBenchmarkProducer(BenchmarkProducer):
-    """Kafka implementation of BenchmarkProducer."""
+    """Kafka producer implementation using confluent-kafka."""
 
-    def __init__(self, producer: KafkaProducer, topic: str):
-        """
-        Initialize Kafka benchmark producer.
-
-        :param producer: Kafka producer instance
-        :param topic: Topic name
-        """
-        self.producer = producer
+    def __init__(self, topic: str, properties: dict):
         self.topic = topic
+        self.producer = Producer(properties)
 
-    def send_async(self, key: Optional[str], payload: bytes) -> Future:
+    def send_async(self, key: str, payload: bytes):
         """
         Send message asynchronously.
 
         :param key: Message key (optional)
         :param payload: Message payload
-        :return: Future that completes when message is sent
+        :return: Future-like object
         """
-        future = Future()
+        class FutureResult:
+            def __init__(self):
+                self.completed = False
+                self.exception_value = None
+                self._result = None
+                self._callbacks = []
 
-        def on_send_success(metadata):
-            future.set_result(None)
+            def set_result(self, result=None):
+                self._result = result
+                self.completed = True
+                self._run_callbacks()
 
-        def on_send_error(exception):
-            future.set_exception(exception)
+            def set_exception(self, exc):
+                self.exception_value = exc
+                self.completed = True
+                self._run_callbacks()
 
-        # Send to Kafka
-        kafka_future = self.producer.send(
-            self.topic,
-            key=key.encode('utf-8') if key else None,
-            value=payload
-        )
+            def exception(self):
+                return self.exception_value
 
-        # Attach callbacks
-        kafka_future.add_callback(on_send_success)
-        kafka_future.add_errback(on_send_error)
+            def result(self):
+                if self.exception_value:
+                    raise self.exception_value
+                return self._result
+
+            def add_done_callback(self, fn):
+                if self.completed:
+                    fn(self)
+                else:
+                    self._callbacks.append(fn)
+
+            def _run_callbacks(self):
+                for callback in self._callbacks:
+                    try:
+                        callback(self)
+                    except:
+                        pass
+                self._callbacks.clear()
+
+        future = FutureResult()
+
+        def delivery_callback(err, msg):
+            if err:
+                future.set_exception(err)
+            else:
+                future.set_result()
+
+        try:
+            # Send message
+            self.producer.produce(
+                topic=self.topic,
+                key=key.encode('utf-8') if key else None,
+                value=payload,
+                callback=delivery_callback
+            )
+
+            # Poll to handle callbacks (non-blocking)
+            self.producer.poll(0)
+
+        except Exception as e:
+            future.set_exception(e)
 
         return future
 
     def close(self):
-        """Close the producer."""
-        self.producer.close()
+        """Close producer and flush pending messages."""
+        try:
+            # Flush all pending messages (wait up to 10 seconds)
+            self.producer.flush(10)
+        except:
+            pass

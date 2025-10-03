@@ -38,14 +38,15 @@ class HistogramDeserializer:
     @staticmethod
     def deserialize_histogram(data: bytes) -> HdrHistogram:
         """
-        Deserialize histogram from compressed byte array.
+        Deserialize histogram from compressed byte array (raw binary).
 
-        :param data: Compressed byte array
+        :param data: Compressed byte array (raw binary format)
         :return: Deserialized histogram
         """
         try:
-            # Decode from compressed format
-            # HdrHistogram.decode expects base64-encoded string
+            # Python's HdrHistogram.decode() expects base64-encoded string
+            # Java's decodeFromCompressedByteBuffer() uses raw binary
+            # So we need to convert raw binary to base64 string
             encoded_str = base64.b64encode(data).decode('ascii')
             return HdrHistogram.decode(encoded_str)
         except Exception as e:
@@ -59,16 +60,15 @@ class HistogramDeserializer:
         """
         Convert JSON-compatible value to histogram.
 
-        :param json_value: Base64-encoded string or bytes
+        :param json_value: Base64-encoded string or raw compressed bytes
         :return: Deserialized histogram
         """
         if isinstance(json_value, str):
-            # Decode from base64 string
-            compressed_bytes = base64.b64decode(json_value)
+            # If already base64 string, decode directly (no double encoding!)
+            return HdrHistogram.decode(json_value)
         else:
-            compressed_bytes = json_value
-
-        return self.deserialize_histogram(compressed_bytes)
+            # If raw binary bytes, convert to base64 first
+            return self.deserialize_histogram(json_value)
 
     def __call__(self, json_value: Union[str, bytes]) -> HdrHistogram:
         """Allow deserializer to be called as a function."""
