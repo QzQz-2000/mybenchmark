@@ -1,0 +1,6 @@
+# Worker nodes list
+# For local testing, you can leave this empty or use localhost
+# For distributed testing, add worker URLs
+workers: []
+#  - http://worker1:8080
+#  - http://worker2:8080

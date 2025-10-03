@@ -1,0 +1,9 @@
+Metadata-Version: 2.1
+Name: openmessaging-benchmark
+Version: 0.1.0
+Requires-Python: >=3.7
+Requires-Dist: pyyaml>=5.1
+Requires-Dist: kafka-python>=2.0.2
+Requires-Dist: hdrhistogram>=0.10.3
+Requires-Dist: requests>=2.25.0
+Requires-Dist: Flask>=2.0.0

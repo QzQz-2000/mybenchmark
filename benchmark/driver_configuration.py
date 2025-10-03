@@ -10,22 +10,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+class DriverConfiguration:
+
+    def __init__(self):
+        self.name = None
+        self.driver_class = None

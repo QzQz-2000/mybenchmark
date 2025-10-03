@@ -10,22 +10,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from .cumulative_latencies import CumulativeLatencies
+from .topic_subscription import TopicSubscription
+from .topics_info import TopicsInfo
+from .period_stats import PeriodStats
+from .producer_work_assignment import ProducerWorkAssignment
+from .consumer_assignment import ConsumerAssignment
+from .counters_stats import CountersStats
 
 __all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
+    'CumulativeLatencies',
+    'TopicSubscription',
+    'TopicsInfo',
+    'PeriodStats',
+    'ProducerWorkAssignment',
+    'ConsumerAssignment',
+    'CountersStats'
 ]

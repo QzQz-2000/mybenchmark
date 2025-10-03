@@ -1,0 +1,75 @@
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import base64
+import threading
+import logging
+from typing import Union
+from hdrh.histogram import HdrHistogram
+
+logger = logging.getLogger(__name__)
+
+
+class HistogramDeserializer:
+    """
+    Deserializer for HdrHistogram from JSON.
+    Equivalent to Jackson's HistogramDeserializer in Java.
+    """
+
+    def __init__(self):
+        # Thread-local buffer (8 MB initial size)
+        self._thread_local = threading.local()
+
+    def _get_buffer(self) -> bytearray:
+        """Get thread-local buffer, create if doesn't exist."""
+        if not hasattr(self._thread_local, 'buffer'):
+            self._thread_local.buffer = bytearray(8 * 1024 * 1024)
+        return self._thread_local.buffer
+
+    @staticmethod
+    def deserialize_histogram(data: bytes) -> HdrHistogram:
+        """
+        Deserialize histogram from compressed byte array.
+
+        :param data: Compressed byte array
+        :return: Deserialized histogram
+        """
+        try:
+            # Decode from compressed format
+            # HdrHistogram.decode expects base64-encoded string
+            encoded_str = base64.b64encode(data).decode('ascii')
+            return HdrHistogram.decode(encoded_str)
+        except Exception as e:
+            logger.error(f"Failed to decode histogram: {e}")
+            # Log hex dump for debugging
+            hex_dump = data.hex()
+            logger.error(f"Hex dump: {hex_dump[:200]}...")
+            raise RuntimeError(f"Failed to deserialize histogram: {e}") from e
+
+    def from_json(self, json_value: Union[str, bytes]) -> HdrHistogram:
+        """
+        Convert JSON-compatible value to histogram.
+
+        :param json_value: Base64-encoded string or bytes
+        :return: Deserialized histogram
+        """
+        if isinstance(json_value, str):
+            # Decode from base64 string
+            compressed_bytes = base64.b64decode(json_value)
+        else:
+            compressed_bytes = json_value
+
+        return self.deserialize_histogram(compressed_bytes)
+
+    def __call__(self, json_value: Union[str, bytes]) -> HdrHistogram:
+        """Allow deserializer to be called as a function."""
+        return self.from_json(json_value)

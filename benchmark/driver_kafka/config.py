@@ -10,22 +10,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+class Config:
+    """Kafka driver configuration."""
+
+    def __init__(self):
+        self.replication_factor = 1
+        self.topic_config = None
+        self.common_config = None
+        self.producer_config = None
+        self.consumer_config = None

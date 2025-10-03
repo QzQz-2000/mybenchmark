@@ -10,22 +10,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from typing import Optional
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+
+class TopicsInfo:
+
+    def __init__(self, number_of_topics: Optional[int] = None,
+                 number_of_partitions_per_topic: Optional[int] = None):
+        self.number_of_topics = number_of_topics
+        self.number_of_partitions_per_topic = number_of_partitions_per_topic

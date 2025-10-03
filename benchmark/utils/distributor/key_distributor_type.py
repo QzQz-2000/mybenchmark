@@ -10,22 +10,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from enum import Enum
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+
+class KeyDistributorType(Enum):
+    """Key distributor that returns null keys to have default publish semantics."""
+    NO_KEY = "NO_KEY"
+
+    """Generate a finite number of "keys" and cycle through them in round-robin fashion."""
+    KEY_ROUND_ROBIN = "KEY_ROUND_ROBIN"
+
+    """Random distribution based on System.nanoTime()."""
+    RANDOM_NANO = "RANDOM_NANO"

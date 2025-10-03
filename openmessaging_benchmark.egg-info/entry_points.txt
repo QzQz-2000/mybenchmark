@@ -1,0 +1,2 @@
+[console_scripts]
+messaging-benchmark = benchmark.benchmark:main

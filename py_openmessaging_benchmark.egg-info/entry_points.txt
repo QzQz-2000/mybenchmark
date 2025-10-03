@@ -1,3 +1,0 @@
-[console_scripts]
-py-omb-coordinator = benchmark.cli:coordinator_main
-py-omb-worker = workers.cli:worker_main

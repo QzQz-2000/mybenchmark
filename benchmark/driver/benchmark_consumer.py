@@ -10,22 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from abc import ABC, abstractmethod
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+
+class BenchmarkConsumer(ABC):
+    """
+    BenchmarkConsumer interface.
+    Equivalent to AutoCloseable in Java.
+    """
+
+    @abstractmethod
+    def close(self):
+        """Close the consumer and cleanup resources."""
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()

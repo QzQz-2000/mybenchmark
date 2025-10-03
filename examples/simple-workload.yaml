@@ -1,0 +1,43 @@
+name: simple-workload
+
+# Number of topics to create
+topics: 1
+
+# Partitions per topic
+partitionsPerTopic: 10
+
+# Message size in bytes
+messageSize: 1024
+
+# Number of subscriptions per topic
+subscriptionsPerTopic: 1
+
+# Producers per topic
+producersPerTopic: 1
+
+# Consumers per subscription
+consumerPerSubscription: 1
+
+# Producer rate (messages/sec, 0 = max rate)
+producerRate: 1000
+
+# Key distribution strategy (NO_KEY, ROUND_ROBIN, RANDOM)
+keyDistributor: NO_KEY
+
+# Test duration in minutes
+testDurationMinutes: 1
+
+# Warmup duration in minutes
+warmupDurationMinutes: 1
+
+# Consumer backlog size in GB (0 = no backlog)
+consumerBacklogSizeGB: 0
+
+# Use randomized payloads
+useRandomizedPayloads: false
+
+# Random bytes ratio
+randomBytesRatio: 0.0
+
+# Randomized payload pool size
+randomizedPayloadPoolSize: 0

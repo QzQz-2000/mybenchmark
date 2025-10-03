@@ -1,0 +1,28 @@
+name: Kafka
+driverClass: benchmark.driver_kafka.kafka_benchmark_driver.KafkaBenchmarkDriver
+
+# Replication factor for Kafka topics
+replicationFactor: 1
+
+# Kafka common configuration
+commonConfig: |
+  bootstrap.servers=localhost:9092
+
+# Producer-specific configuration
+producerConfig: |
+  acks=1
+  linger.ms=10
+  batch.size=16384
+  request.timeout.ms=30000
+  delivery.timeout.ms=120000
+  max.in.flight.requests.per.connection=5
+  buffer.memory=33554432
+
+# Consumer-specific configuration
+consumerConfig: |
+  auto.offset.reset=earliest
+  enable.auto.commit=false
+
+# Topic configuration
+topicConfig: |
+  min.insync.replicas=1

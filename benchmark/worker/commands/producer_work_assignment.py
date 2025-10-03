@@ -10,22 +10,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from typing import List, Optional
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+
+class ProducerWorkAssignment:
+
+    def __init__(self):
+        self.payload_data: Optional[List[bytes]] = None
+        self.publish_rate: float = 0.0
+        self.key_distributor_type = None  # KeyDistributorType
+
+    def with_publish_rate(self, publish_rate: float) -> 'ProducerWorkAssignment':
+        copy = ProducerWorkAssignment()
+        copy.key_distributor_type = self.key_distributor_type
+        copy.payload_data = self.payload_data
+        copy.publish_rate = publish_rate
+        return copy

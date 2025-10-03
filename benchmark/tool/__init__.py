@@ -10,22 +10,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
+from .workload_name_format import WorkloadNameFormat
+from .workload_set_template import WorkloadSetTemplate
 from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from .workload_generation_tool import WorkloadGenerationTool
 
 __all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
+    'WorkloadNameFormat',
+    'WorkloadSetTemplate',
     'WorkloadGenerator',
-    'Workers'
+    'WorkloadGenerationTool'
 ]

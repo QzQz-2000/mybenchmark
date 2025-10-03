@@ -10,22 +10,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+import random
+import base64
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+
+class RandomGenerator:
+
+    _random = random.Random()
+
+    @staticmethod
+    def get_random_string() -> str:
+        buffer = RandomGenerator._random.randbytes(5)
+        return base64.urlsafe_b64encode(buffer).decode('ascii').rstrip('=')

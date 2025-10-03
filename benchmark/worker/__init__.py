@@ -10,22 +10,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from .worker import Worker
+from .worker_stats import WorkerStats
+from .message_producer import MessageProducer
+from .local_worker import LocalWorker
+from .http_worker_client import HttpWorkerClient
+from .distributed_workers_ensemble import DistributedWorkersEnsemble
+from .benchmark_worker import BenchmarkWorker
+from .worker_handler import WorkerHandler
 
 __all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
+    'Worker',
+    'WorkerStats',
+    'MessageProducer',
+    'LocalWorker',
+    'HttpWorkerClient',
+    'DistributedWorkersEnsemble',
+    'BenchmarkWorker',
+    'WorkerHandler'
 ]

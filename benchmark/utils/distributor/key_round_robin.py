@@ -10,22 +10,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from .key_distributor import KeyDistributor
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+
+class KeyRoundRobin(KeyDistributor):
+    """
+    Not thread-safe implementation.
+    Equivalent to @NotThreadSafe annotation in Java.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.current_index = 0
+
+    def next(self) -> str:
+        self.current_index += 1
+        if self.current_index >= self.get_length():
+            self.current_index = 0
+        return self.get(self.current_index)

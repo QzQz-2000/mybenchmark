@@ -10,22 +10,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from .key_distributor_type import KeyDistributorType
+from .key_distributor import KeyDistributor
+from .no_key_distributor import NoKeyDistributor
+from .key_round_robin import KeyRoundRobin
+from .random_nano import RandomNano
 
 __all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
+    'KeyDistributorType',
+    'KeyDistributor',
+    'NoKeyDistributor',
+    'KeyRoundRobin',
+    'RandomNano'
 ]

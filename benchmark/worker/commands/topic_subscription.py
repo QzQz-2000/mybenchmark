@@ -10,22 +10,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .benchmark import Benchmark
-from .driver_configuration import DriverConfiguration
-from .rate_controller import RateController
-from .results_to_csv import ResultsToCsv
-from .test_result import TestResult
-from .workload import Workload
-from .workload_generator import WorkloadGenerator
-from .workers import Workers
+from typing import Optional
 
-__all__ = [
-    'Benchmark',
-    'DriverConfiguration',
-    'RateController',
-    'ResultsToCsv',
-    'TestResult',
-    'Workload',
-    'WorkloadGenerator',
-    'Workers'
-]
+
+class TopicSubscription:
+
+    def __init__(self, topic: Optional[str] = None, subscription: Optional[str] = None):
+        self.topic = topic
+        self.subscription = subscription
+
+    def __str__(self) -> str:
+        return f"TopicSubscription{{topic='{self.topic}', subscription='{self.subscription}'}}"
+
+    def __repr__(self) -> str:
+        return self.__str__()
