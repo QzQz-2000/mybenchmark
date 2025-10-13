@@ -92,3 +92,16 @@ See `requirements.txt` for full list.
 ## License
 
 Apache License 2.0
+
+
+docker run -it \
+  -p 6650:6650 \
+  -p 8080:8080 \
+  --name pulsar-standalone \
+  apachepulsar/pulsar:3.2.0 \
+  bin/pulsar standalone
+
+
+python -m benchmark.benchmark \
+      -d examples/pulsar-driver.yaml \
+      workloads/1-topic-1-partition-1kb.yaml

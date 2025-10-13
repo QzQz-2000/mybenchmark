@@ -1,0 +1,15 @@
+# Latency test: small messages for minimal latency
+
+name: Latency Test / 100B messages
+
+topics: 1
+partitionsPerTopic: 1
+keyDistributor: "NO_KEY"
+messageSize: 100
+subscriptionsPerTopic: 1
+consumerPerSubscription: 1
+producersPerTopic: 1
+producerRate: 10000
+consumerBacklogSizeGB: 0
+testDurationMinutes: 10
+warmupDurationMinutes: 1

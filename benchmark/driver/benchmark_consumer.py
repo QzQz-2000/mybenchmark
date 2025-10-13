@@ -12,7 +12,7 @@
 
 from abc import ABC, abstractmethod
 
-
+# 抽象类
 class BenchmarkConsumer(ABC):
     """
     BenchmarkConsumer interface.
@@ -24,8 +24,10 @@ class BenchmarkConsumer(ABC):
         """Close the consumer and cleanup resources."""
         pass
 
+    # 当使用with时，返回对象本身
     def __enter__(self):
         return self
 
+    # 当使用with时，结束时自动调用close()
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()

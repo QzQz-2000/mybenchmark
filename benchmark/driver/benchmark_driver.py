@@ -61,6 +61,7 @@ class BenchmarkDriver(ABC):
         """
         pass
 
+    # 生成多个topic的统一前缀
     @abstractmethod
     def get_topic_name_prefix(self) -> str:
         """
@@ -70,6 +71,7 @@ class BenchmarkDriver(ABC):
         """
         pass
 
+    # 创建单个producer
     @abstractmethod
     def create_topic(self, topic: str, partitions: int) -> Future:
         """
@@ -81,6 +83,7 @@ class BenchmarkDriver(ABC):
         """
         pass
 
+    # 批量创建topics
     def create_topics(self, topic_infos: List[TopicInfo]) -> Future:
         """
         Create a list of new topics with the given number of partitions.

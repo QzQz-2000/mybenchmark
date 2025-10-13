@@ -1,0 +1,63 @@
+#
+# Licensed under the Apache License, Version 2.0
+#
+
+name: Pulsar
+driverClass: benchmark.drivers.pulsar.PulsarBenchmarkDriver
+
+# Pulsar client-specific configuration
+client:
+  serviceUrl: pulsar://localhost:6650
+  httpUrl: http://localhost:8080
+  ioThreads: 16
+  listenerThreads: 4
+  statsIntervalSeconds: 5
+  clusterName: standalone
+
+  # Namespace configuration
+  # - namespacePrefix: Base namespace path (default: "benchmark/ns")
+  # - useFixedNamespace: If true, use namespacePrefix as-is for all tests (idempotent, topics reused)
+  #                      If false, append random suffix (legacy, topics accumulate)
+  namespacePrefix: benchmark/ns-fixed
+  useFixedNamespace: true  # Set to true for idempotent tests with proper cleanup
+
+  topicType: persistent
+  persistence:
+    ensembleSize: 1
+    writeQuorum: 1
+    ackQuorum: 1
+    deduplicationEnabled: false
+  tlsAllowInsecureConnection: false
+  tlsEnableHostnameVerification: false
+  tlsTrustCertsFilePath:
+  authentication:
+    plugin:
+    data:
+
+# Producer configuration
+producer:
+  producerCount: 4                # 并发生产者数量
+  batchingEnabled: true
+  batchingMaxMessages: 100
+  batchingMaxPublishDelayMs: 1
+  blockIfQueueFull: true
+  pendingQueueSize: 1000
+  sendTimeoutMs: 30000            # 发送超时
+
+# Consumer configuration
+consumer:
+  consumerCount: 8                 # 并发消费者数量
+  subscriptionName: sub-000-qyXr4mI
+  subscriptionType: Shared         # Kafka 式轮询消费模式，避免 Exclusive 冲突
+  receiverQueueSize: 5000          # 增大接收队列，减少 TimeOut
+  receiveTimeoutMs: 0              # 阻塞接收
+  consumerNamePrefix: agent
+
+# Benchmark configuration
+benchmark:
+  topicName: persistent://benchmark/ns-fixed/test
+  partitions: 8                    # 多分区支持多个消费者
+  durationSeconds: 60
+  producerRate: 1800               # 生产速率 msgs/s
+  statsIntervalSeconds: 5
+  maxPendingMessages: 10000        # Producer 队列长度

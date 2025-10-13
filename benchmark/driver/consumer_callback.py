@@ -13,7 +13,7 @@
 from abc import ABC, abstractmethod
 from typing import Union
 
-
+# 回调，只关心异步消息处理
 class ConsumerCallback(ABC):
     """
     Callback that the driver implementation calls when a message is received.

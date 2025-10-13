@@ -1,15 +1,3 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import logging
 import multiprocessing
 import threading
@@ -28,23 +16,28 @@ def _consumer_loop_func(topic, properties, message_queue, poll_timeout, closing,
 
     message_count = 0
     commit_interval = 100  # Commit every 100 messages
+    was_paused = False  # Track pause state to avoid redundant calls
 
     try:
         while not closing.is_set():
             try:
                 if paused.is_set():
-                    # Pause all assigned partitions when paused
-                    partitions = consumer.assignment()
-                    if partitions:
-                        consumer.pause(partitions)
+                    # Only pause when state changes
+                    if not was_paused:
+                        partitions = consumer.assignment()
+                        if partitions:
+                            consumer.pause(partitions)
+                        was_paused = True
                     import time
                     time.sleep(0.1)
                     continue
                 else:
-                    # Resume all assigned partitions when not paused
-                    partitions = consumer.assignment()
-                    if partitions:
-                        consumer.resume(partitions)
+                    # Only resume when state changes
+                    if was_paused:
+                        partitions = consumer.assignment()
+                        if partitions:
+                            consumer.resume(partitions)
+                        was_paused = False
 
                 # Poll for messages
                 msg = consumer.poll(timeout=poll_timeout)
@@ -57,15 +50,16 @@ def _consumer_loop_func(topic, properties, message_queue, poll_timeout, closing,
                     continue
 
                 # Send message to parent process via queue
-                # Use message timestamp (in milliseconds, convert to microseconds)
+                # Use message timestamp (in milliseconds - same as Java)
                 # timestamp()[0] = type: 0=not available, 1=create time, 2=log append time
                 # timestamp()[1] = timestamp in milliseconds
                 timestamp_type, timestamp_ms = msg.timestamp()
                 if timestamp_type != 0:  # TIMESTAMP_NOT_AVAILABLE
-                    timestamp_us = timestamp_ms * 1000
+                    publish_timestamp_ms = timestamp_ms
                 else:
-                    timestamp_us = 0
-                message_queue.put((msg.value(), timestamp_us))
+                    publish_timestamp_ms = 0
+                # 变量名明确标注单位：_ms = milliseconds
+                message_queue.put((msg.value(), publish_timestamp_ms))
 
                 # Commit offset periodically (every N messages)
                 message_count += 1
@@ -137,8 +131,10 @@ class KafkaBenchmarkConsumer(BenchmarkConsumer):
             try:
                 # Get message from queue with timeout
                 try:
-                    payload, timestamp_us = self.message_queue.get(timeout=0.1)
-                    self.callback.message_received(payload, timestamp_us)
+                    # 变量名明确标注单位：_ms = milliseconds
+                    payload, publish_timestamp_ms = self.message_queue.get(timeout=0.1)
+                    # message_received接口需要毫秒级时间戳
+                    self.callback.message_received(payload, publish_timestamp_ms)
                 except:
                     # Queue empty or timeout
                     pass

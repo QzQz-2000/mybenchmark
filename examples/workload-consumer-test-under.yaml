@@ -1,0 +1,27 @@
+# Consumer数量测试 - 过少配置
+# Consumer数 < 分区数 (5 < 10)
+
+name: consumer-test-under
+
+# Topic配置
+topics: 1
+partitionsPerTopic: 10
+
+# Agent配置
+producersPerTopic: 10
+subscriptionsPerTopic: 1
+consumerPerSubscription: 5  # ⚠️ 过少：每个consumer处理2个分区
+
+# 消息配置
+messageSize: 1024
+keyDistributor: NO_KEY
+
+# 速率配置
+producerRate: 10  # 10个producer * 10 msg/s = 100 msg/s
+
+# 测试时长
+testDurationMinutes: 1
+warmupDurationMinutes: 1
+
+# 积压测试
+consumerBacklogSizeGB: 0

@@ -1,0 +1,227 @@
+{
+  "workload": "Consumer Scaling Test",
+  "driver": "Pulsar",
+  "messageSize": 2048,
+  "topics": 1,
+  "partitions": 1,
+  "producersPerTopic": 1,
+  "consumersPerTopic": 1,
+  "publishRate": [
+    1805.555293759535,
+    1729.7223468155253,
+    1994.9618165900004,
+    1886.8575238076235,
+    1588.4571415524433
+  ],
+  "publishErrorRate": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "consumeRate": [
+    5052.4757514316425,
+    5152.5940549506495,
+    6076.09624964811,
+    5655.775476023359,
+    5126.4160930751295
+  ],
+  "backlog": [
+    3643,
+    4009,
+    3095,
+    3143,
+    0
+  ],
+  "publishLatency50pct": [
+    539,
+    523,
+    478,
+    528,
+    562
+  ],
+  "publishLatency75pct": [
+    660,
+    608,
+    542,
+    603,
+    635
+  ],
+  "publishLatency95pct": [
+    888,
+    1554,
+    745,
+    812,
+    773
+  ],
+  "publishLatency99pct": [
+    956,
+    1669,
+    877,
+    957,
+    819
+  ],
+  "publishLatency999pct": [
+    990,
+    1702,
+    959,
+    1042,
+    855
+  ],
+  "publishLatency9999pct": [
+    996,
+    1726,
+    960,
+    1042,
+    856
+  ],
+  "publishLatencyMax": [
+    1009,
+    1727,
+    990,
+    1045,
+    869
+  ],
+  "publishDelayLatency50pct": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "publishDelayLatency75pct": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "publishDelayLatency95pct": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "publishDelayLatency99pct": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "publishDelayLatency999pct": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "publishDelayLatency9999pct": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "publishDelayLatencyMax": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "aggregatedPublishLatencyAvg": 537.5734201077199,
+  "aggregatedPublishLatency50pct": 514,
+  "aggregatedPublishLatency75pct": 595,
+  "aggregatedPublishLatency95pct": 798,
+  "aggregatedPublishLatency99pct": 973,
+  "aggregatedPublishLatency999pct": 1671,
+  "aggregatedPublishLatency9999pct": 1725,
+  "aggregatedPublishLatencyMax": 1727,
+  "aggregatedPublishDelayLatencyAvg": 0.0,
+  "aggregatedPublishDelayLatency50pct": 0,
+  "aggregatedPublishDelayLatency75pct": 0,
+  "aggregatedPublishDelayLatency95pct": 0,
+  "aggregatedPublishDelayLatency99pct": 0,
+  "aggregatedPublishDelayLatency999pct": 0,
+  "aggregatedPublishDelayLatency9999pct": 0,
+  "aggregatedPublishDelayLatencyMax": 0,
+  "aggregatedPublishLatencyQuantiles": {
+    "50": 514,
+    "75": 595,
+    "90": 705,
+    "95": 798,
+    "99": 973,
+    "99.9": 1671,
+    "99.99": 1725
+  },
+  "aggregatedPublishDelayLatencyQuantiles": {},
+  "endToEndLatency50pct": [
+    686,
+    653,
+    596,
+    669,
+    678
+  ],
+  "endToEndLatency75pct": [
+    833,
+    758,
+    674,
+    806,
+    759
+  ],
+  "endToEndLatency95pct": [
+    1081,
+    1695,
+    866,
+    1002,
+    901
+  ],
+  "endToEndLatency99pct": [
+    1263,
+    1799,
+    1009,
+    1167,
+    1007
+  ],
+  "endToEndLatency999pct": [
+    1505,
+    1834,
+    1059,
+    1278,
+    1064
+  ],
+  "endToEndLatency9999pct": [
+    1514,
+    1836,
+    1072,
+    1300,
+    1068
+  ],
+  "endToEndLatencyMax": [
+    1517,
+    1862,
+    1073,
+    1301,
+    1070
+  ],
+  "aggregatedEndToEndLatencyQuantiles": {
+    "50": 641,
+    "75": 729,
+    "90": 881,
+    "95": 970,
+    "99": 1659,
+    "99.9": 1818,
+    "99.99": 1834
+  },
+  "aggregatedEndToEndLatencyAvg": 675.4113429524069,
+  "aggregatedEndToEndLatency50pct": 641,
+  "aggregatedEndToEndLatency75pct": 729,
+  "aggregatedEndToEndLatency95pct": 970,
+  "aggregatedEndToEndLatency99pct": 1659,
+  "aggregatedEndToEndLatency999pct": 1818,
+  "aggregatedEndToEndLatency9999pct": 1834,
+  "aggregatedEndToEndLatencyMax": 1862
+}

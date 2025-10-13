@@ -30,20 +30,22 @@ class HttpWorkerClient(Worker):
     HTTP client for remote worker communication.
     """
 
-    def __init__(self, worker_address: str):
+    def __init__(self, worker_address: str, default_timeout: int = 30):
         """
         Initialize HTTP worker client.
 
         :param worker_address: Worker address (e.g., "http://localhost:8080")
+        :param default_timeout: Default timeout for HTTP requests in seconds (default: 30)
         """
         self.worker_address = worker_address.rstrip('/')
         self.session = requests.Session()
+        self.default_timeout = default_timeout
 
     def initialize_driver(self, configuration_file: str):
         """Initialize driver on remote worker."""
         with open(configuration_file, 'rb') as f:
             files = {'file': f}
-            response = self.session.post(f"{self.worker_address}/initialize-driver", files=files)
+            response = self.session.post(f"{self.worker_address}/initialize-driver", files=files, timeout=self.default_timeout)
             response.raise_for_status()
 
     def create_topics(self, topics_info: TopicsInfo) -> List[str]:
@@ -52,13 +54,13 @@ class HttpWorkerClient(Worker):
             'numberOfTopics': topics_info.number_of_topics,
             'numberOfPartitionsPerTopic': topics_info.number_of_partitions_per_topic
         }
-        response = self.session.post(f"{self.worker_address}/create-topics", json=data)
+        response = self.session.post(f"{self.worker_address}/create-topics", json=data, timeout=self.default_timeout)
         response.raise_for_status()
         return response.json()
 
     def create_producers(self, topics: List[str]):
         """Create producers on remote worker."""
-        response = self.session.post(f"{self.worker_address}/create-producers", json=topics)
+        response = self.session.post(f"{self.worker_address}/create-producers", json=topics, timeout=self.default_timeout)
         response.raise_for_status()
 
     def create_consumers(self, consumer_assignment: ConsumerAssignment):
@@ -69,12 +71,12 @@ class HttpWorkerClient(Worker):
                 for ts in consumer_assignment.topics_subscriptions
             ]
         }
-        response = self.session.post(f"{self.worker_address}/create-consumers", json=data)
+        response = self.session.post(f"{self.worker_address}/create-consumers", json=data, timeout=self.default_timeout)
         response.raise_for_status()
 
     def probe_producers(self):
         """Probe producers on remote worker."""
-        response = self.session.post(f"{self.worker_address}/probe-producers")
+        response = self.session.post(f"{self.worker_address}/probe-producers", timeout=self.default_timeout)
         response.raise_for_status()
 
     def start_load(self, producer_work_assignment: ProducerWorkAssignment):
@@ -84,27 +86,27 @@ class HttpWorkerClient(Worker):
             'keyDistributorType': producer_work_assignment.key_distributor_type.value if producer_work_assignment.key_distributor_type else None,
             'payloadData': [list(payload) for payload in producer_work_assignment.payload_data] if producer_work_assignment.payload_data else []
         }
-        response = self.session.post(f"{self.worker_address}/start-load", json=data)
+        response = self.session.post(f"{self.worker_address}/start-load", json=data, timeout=self.default_timeout)
         response.raise_for_status()
 
     def adjust_publish_rate(self, publish_rate: float):
         """Adjust publish rate on remote worker."""
-        response = self.session.post(f"{self.worker_address}/adjust-rate", json={'publishRate': publish_rate})
+        response = self.session.post(f"{self.worker_address}/adjust-rate", json={'publishRate': publish_rate}, timeout=self.default_timeout)
         response.raise_for_status()
 
     def pause_consumers(self):
         """Pause consumers on remote worker."""
-        response = self.session.post(f"{self.worker_address}/pause-consumers")
+        response = self.session.post(f"{self.worker_address}/pause-consumers", timeout=self.default_timeout)
         response.raise_for_status()
 
     def resume_consumers(self):
         """Resume consumers on remote worker."""
-        response = self.session.post(f"{self.worker_address}/resume-consumers")
+        response = self.session.post(f"{self.worker_address}/resume-consumers", timeout=self.default_timeout)
         response.raise_for_status()
 
     def get_counters_stats(self) -> CountersStats:
         """Get counter stats from remote worker."""
-        response = self.session.get(f"{self.worker_address}/counters-stats")
+        response = self.session.get(f"{self.worker_address}/counters-stats", timeout=self.default_timeout)
         response.raise_for_status()
         data = response.json()
 
@@ -116,21 +118,21 @@ class HttpWorkerClient(Worker):
 
     def get_period_stats(self) -> PeriodStats:
         """Get period stats from remote worker."""
-        response = self.session.get(f"{self.worker_address}/period-stats")
+        response = self.session.get(f"{self.worker_address}/period-stats", timeout=self.default_timeout)
         response.raise_for_status()
         # TODO: Deserialize PeriodStats with histograms
         return response.json()
 
     def get_cumulative_latencies(self) -> CumulativeLatencies:
         """Get cumulative latencies from remote worker."""
-        response = self.session.get(f"{self.worker_address}/cumulative-latencies")
+        response = self.session.get(f"{self.worker_address}/cumulative-latencies", timeout=self.default_timeout)
         response.raise_for_status()
         # TODO: Deserialize CumulativeLatencies with histograms
         return response.json()
 
     def reset_stats(self):
         """Reset stats on remote worker."""
-        response = self.session.post(f"{self.worker_address}/reset-stats")
+        response = self.session.post(f"{self.worker_address}/reset-stats", timeout=self.default_timeout)
         response.raise_for_status()
 
     def stop_all(self):

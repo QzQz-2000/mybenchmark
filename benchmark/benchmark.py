@@ -26,6 +26,14 @@ from benchmark.workload_generator import WorkloadGenerator
 
 logger = logging.getLogger(__name__)
 
+#   程序接受这些参数：
+#   - -d / --drivers：驱动配置文件（如 kafka.yaml）
+#   - -w / --workers：工作节点地址列表
+#   - -wf / --workers-file：工作节点配置文件
+#   - workloads：测试任务配置文件
+
+#   例子：
+#   python -m benchmark -d kafka.yaml -wf workers.yaml simple-workload.yaml
 
 class Benchmark:
     """Main benchmark application."""
@@ -106,7 +114,7 @@ class Benchmark:
         # Dump configuration variables
         logger.info(f"Starting benchmark with config: {json.dumps(vars(arguments), indent=2)}")
 
-        # Load workloads
+          # 读取workload配置文件，加载配置
         workloads: Dict[str, Workload] = {}
         for path in arguments.workloads:
             file_path = Path(path)
@@ -132,14 +140,16 @@ class Benchmark:
         from benchmark.worker.http_worker_client import HttpWorkerClient
         from benchmark.worker.distributed_workers_ensemble import DistributedWorkersEnsemble
 
+        # 用分布模式
         if arguments.workers is not None and len(arguments.workers) > 0:
             workers_list = [HttpWorkerClient(w) for w in arguments.workers]
             worker = DistributedWorkersEnsemble(workers_list, arguments.extra_consumers)
         else:
-            # Use local worker implementation
+            # 用本地模式 (ISOLATED多进程架构)
+            logger.info("Using LocalWorker (multi-process ISOLATED architecture)")
             worker = LocalWorker()
 
-        # Run benchmarks
+        # Run benchmarks，顺序执行，不是一起测试的
         for workload_name, workload in workloads.items():
             for driver_config in arguments.drivers:
                 try:
@@ -238,7 +248,7 @@ class Benchmark:
             'publishErrorRate': result.publish_error_rate,
             'consumeRate': result.consume_rate,
             'backlog': result.backlog,
-            'publishLatencyAvg': result.publish_latency_avg,
+            # ⚡ Removed period avg lists - only aggregated avg is meaningful
             'publishLatency50pct': result.publish_latency_50pct,
             'publishLatency75pct': result.publish_latency_75pct,
             'publishLatency95pct': result.publish_latency_95pct,
@@ -246,7 +256,6 @@ class Benchmark:
             'publishLatency999pct': result.publish_latency_999pct,
             'publishLatency9999pct': result.publish_latency_9999pct,
             'publishLatencyMax': result.publish_latency_max,
-            'publishDelayLatencyAvg': result.publish_delay_latency_avg,
             'publishDelayLatency50pct': result.publish_delay_latency_50pct,
             'publishDelayLatency75pct': result.publish_delay_latency_75pct,
             'publishDelayLatency95pct': result.publish_delay_latency_95pct,
@@ -272,7 +281,7 @@ class Benchmark:
             'aggregatedPublishDelayLatencyMax': result.aggregated_publish_delay_latency_max,
             'aggregatedPublishLatencyQuantiles': result.aggregated_publish_latency_quantiles,
             'aggregatedPublishDelayLatencyQuantiles': result.aggregated_publish_delay_latency_quantiles,
-            'endToEndLatencyAvg': result.end_to_end_latency_avg,
+            # ⚡ Removed period avg lists - only aggregated avg is meaningful
             'endToEndLatency50pct': result.end_to_end_latency_50pct,
             'endToEndLatency75pct': result.end_to_end_latency_75pct,
             'endToEndLatency95pct': result.end_to_end_latency_95pct,

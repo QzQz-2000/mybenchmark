@@ -1,0 +1,11 @@
+name: msg-size-64KB-fixed
+topics: 1
+partitionsPerTopic: 10
+messageSize: 65536
+keyDistributor: RANDOM_NANO
+subscriptionsPerTopic: 1
+producersPerTopic: 10
+consumerPerSubscription: 10
+producerRate: 100
+testDurationMinutes: 2
+warmupDurationMinutes: 0

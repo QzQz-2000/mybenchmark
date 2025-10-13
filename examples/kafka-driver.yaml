@@ -11,12 +11,13 @@ commonConfig: |
 # Producer-specific configuration (confluent-kafka uses librdkafka parameters)
 producerConfig: |
   acks=1
-  linger.ms=10
-  batch.size=16384
+  linger.ms=0
+  batch.size=13101
   request.timeout.ms=30000
   delivery.timeout.ms=120000
-  max.in.flight.requests.per.connection=5
-  queue.buffering.max.kbytes=32768
+  max.in.flight.requests.per.connection=10
+  queue.buffering.max.kbytes=10485760000
+  compression.type=lz4
 
 # Consumer-specific configuration
 consumerConfig: |
@@ -28,4 +29,3 @@ consumerConfig: |
 # Topic configuration
 topicConfig: |
   min.insync.replicas=1
-  message.timestamp.type=CreateTime

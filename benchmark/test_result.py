@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# 测试的一些指标
 from typing import List, Dict
 
 
@@ -29,7 +30,8 @@ class TestResult:
         self.consume_rate: List[float] = []
         self.backlog: List[int] = []
 
-        self.publish_latency_avg: List[float] = []
+        # ⚡ Removed period avg lists - only percentiles tracked per period
+        # Mean is calculated once at the end from complete histogram (aggregated_*_avg)
         self.publish_latency_50pct: List[float] = []
         self.publish_latency_75pct: List[float] = []
         self.publish_latency_95pct: List[float] = []
@@ -38,7 +40,6 @@ class TestResult:
         self.publish_latency_9999pct: List[float] = []
         self.publish_latency_max: List[float] = []
 
-        self.publish_delay_latency_avg: List[float] = []
         self.publish_delay_latency_50pct: List[int] = []
         self.publish_delay_latency_75pct: List[int] = []
         self.publish_delay_latency_95pct: List[int] = []
@@ -71,8 +72,7 @@ class TestResult:
 
         # End to end latencies (from producer to consumer)
         # Latencies are expressed in milliseconds (without decimals)
-
-        self.end_to_end_latency_avg: List[float] = []
+        # ⚡ Removed period avg lists - only percentiles tracked per period
         self.end_to_end_latency_50pct: List[float] = []
         self.end_to_end_latency_75pct: List[float] = []
         self.end_to_end_latency_95pct: List[float] = []

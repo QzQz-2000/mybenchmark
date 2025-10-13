@@ -16,12 +16,12 @@ from hdrh.histogram import HdrHistogram
 class CumulativeLatencies:
 
     def __init__(self):
-        # 60 seconds in microseconds, 5 significant digits
-        self.publish_latency = HdrHistogram(1, 60 * 1_000_000, 5)
-        # 60 seconds in microseconds, 5 significant digits
-        self.publish_delay_latency = HdrHistogram(1, 60 * 1_000_000, 5)
-        # 12 hours in microseconds, 5 significant digits
-        self.end_to_end_latency = HdrHistogram(1, 12 * 60 * 60 * 1_000_000, 5)
+        # 60 seconds in milliseconds, 5 significant digits
+        self.publish_latency = HdrHistogram(1, 60 * 1_000, 5)
+        # 60 seconds in milliseconds, 5 significant digits
+        self.publish_delay_latency = HdrHistogram(1, 60 * 1_000, 5)
+        # 12 hours in milliseconds, 5 significant digits
+        self.end_to_end_latency = HdrHistogram(1, 12 * 60 * 60 * 1_000, 5)
 
     def plus(self, to_add: 'CumulativeLatencies') -> 'CumulativeLatencies':
         result = CumulativeLatencies()

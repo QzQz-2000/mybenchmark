@@ -1,7 +1,7 @@
 name: simple-workload
 
 # Number of topics to create
-topics: 1
+topics: 3
 
 # Partitions per topic
 partitionsPerTopic: 10
@@ -13,13 +13,13 @@ messageSize: 1024
 subscriptionsPerTopic: 1
 
 # Producers per topic
-producersPerTopic: 1
+producersPerTopic: 4
 
 # Consumers per subscription
-consumerPerSubscription: 1
+consumerPerSubscription: 3
 
 # Producer rate (messages/sec, 0 = max rate)
-producerRate: 1000
+producerRate: 3000
 
 # Key distribution strategy (NO_KEY, ROUND_ROBIN, RANDOM)
 keyDistributor: NO_KEY

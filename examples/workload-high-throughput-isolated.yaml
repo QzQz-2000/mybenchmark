@@ -1,0 +1,28 @@
+# High Throughput Test - ISOLATED Mode
+# 测试Kafka在大量独立连接下的高吞吐量性能
+
+name: high-throughput-isolated
+
+# Topic配置
+topics: 2
+partitionsPerTopic: 20
+
+# Agent配置
+producersPerTopic: 50  # 每个topic 50个Agent，总共100个独立进程
+subscriptionsPerTopic: 1
+consumerPerSubscription: 20
+
+# 消息配置
+messageSize: 1024  # 1KB消息
+keyDistributor: RANDOM  # 随机分布，负载均衡
+
+# 高吞吐量配置
+producerRate: 100  # 每个Agent 100 msg/s
+# 总速率 = 2 topics * 50 agents * 100 = 10,000 msg/s
+
+# 测试时长
+testDurationMinutes: 10
+warmupDurationMinutes: 2
+
+# 不测试积压
+consumerBacklogSizeGB: 0

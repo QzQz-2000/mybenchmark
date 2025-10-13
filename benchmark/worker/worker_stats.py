@@ -15,6 +15,7 @@ from hdrh.histogram import HdrHistogram
 from .commands.counters_stats import CountersStats
 from .commands.cumulative_latencies import CumulativeLatencies
 from .commands.period_stats import PeriodStats
+from .histogram_recorder import HistogramRecorder
 
 
 class LongAdder:
@@ -50,9 +51,10 @@ class LongAdder:
 class WorkerStats:
     """
     Worker statistics collector.
+    统一使用毫秒(ms)作为延迟单位
     """
 
-    HIGHEST_TRACKABLE_VALUE = 60 * 1_000_000  # 60 seconds in microseconds
+    HIGHEST_TRACKABLE_VALUE = 60 * 1_000  # 60 seconds in milliseconds
 
     def __init__(self, stats_logger=None):
         """
@@ -61,10 +63,6 @@ class WorkerStats:
         :param stats_logger: Optional stats logger (Bookkeeper StatsLogger equivalent)
         """
         self.stats_logger = stats_logger
-
-        # Recorders for histograms (using HdrHistogram)
-        self.end_to_end_latency_recorder = HdrHistogram(1, 12 * 60 * 60 * 1_000_000, 5)  # 12 hours
-        self.end_to_end_cumulative_latency_recorder = HdrHistogram(1, 12 * 60 * 60 * 1_000_000, 5)
 
         # Producer stats
         self.messages_sent = LongAdder()
@@ -82,13 +80,16 @@ class WorkerStats:
         self.total_messages_received = LongAdder()
         self.total_bytes_received = LongAdder()
 
-        # Publish latency recorders
-        self.publish_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
-        self.cumulative_publish_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+        # 🚀 使用双缓冲Recorder（模仿Java版本）- 周期统计极快！
+        # 所有延迟单位统一为毫秒(ms)
+        self.publish_latency_recorder = HistogramRecorder(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+        self.publish_delay_latency_recorder = HistogramRecorder(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+        self.end_to_end_latency_recorder = HistogramRecorder(1, 12 * 60 * 60 * 1_000, 5)  # 12 hours in ms
 
-        # Publish delay latency recorders
-        self.publish_delay_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
-        self.cumulative_publish_delay_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+        # Cumulative histograms（累积所有数据）
+        self.cumulative_publish_latency = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+        self.cumulative_publish_delay_latency = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+        self.cumulative_end_to_end_latency = HdrHistogram(1, 12 * 60 * 60 * 1_000, 5)  # 12 hours in ms
 
         # Lock for histogram operations
         self.histogram_lock = threading.Lock()
@@ -101,22 +102,24 @@ class WorkerStats:
         """Record that a message was sent."""
         self.total_messages_sent.increment()
 
-    def record_message_received(self, payload_length: int, end_to_end_latency_micros: int):
+    def record_message_received(self, payload_length: int, end_to_end_latency_millis: int):
         """
         Record that a message was received.
 
         :param payload_length: Size of the payload in bytes
-        :param end_to_end_latency_micros: End-to-end latency in microseconds
+        :param end_to_end_latency_millis: End-to-end latency in milliseconds
         """
         self.messages_received.increment()
         self.total_messages_received.increment()
         self.bytes_received.add(payload_length)
         self.total_bytes_received.add(payload_length)
 
-        if end_to_end_latency_micros > 0:
+        if end_to_end_latency_millis > 0:
+            # Recorder内部已有锁，不需要额外加锁
+            self.end_to_end_latency_recorder.record_value(end_to_end_latency_millis)
+            # 同时记录到cumulative
             with self.histogram_lock:
-                self.end_to_end_cumulative_latency_recorder.record_value(end_to_end_latency_micros)
-                self.end_to_end_latency_recorder.record_value(end_to_end_latency_micros)
+                self.cumulative_end_to_end_latency.record_value(end_to_end_latency_millis)
 
     def to_period_stats(self) -> PeriodStats:
         """
@@ -124,6 +127,11 @@ class WorkerStats:
 
         :return: PeriodStats instance
         """
+        import time
+        import logging
+        logger = logging.getLogger(__name__)
+
+        start = time.perf_counter()
         stats = PeriodStats()
 
         stats.messages_sent = self.messages_sent.sum_then_reset()
@@ -137,10 +145,17 @@ class WorkerStats:
         stats.total_message_send_errors = self.total_message_send_errors.sum()
         stats.total_messages_received = self.total_messages_received.sum()
 
-        # Get interval histograms (resets the recorder)
-        stats.publish_latency = self._get_interval_histogram(self.publish_latency_recorder)
-        stats.publish_delay_latency = self._get_interval_histogram(self.publish_delay_latency_recorder)
-        stats.end_to_end_latency = self._get_interval_histogram(self.end_to_end_latency_recorder)
+        t1 = time.perf_counter()
+        # 🚀 使用Recorder的get_interval_histogram()，极快的O(1)指针交换！
+        stats.publish_latency = self.publish_latency_recorder.get_interval_histogram()
+        t2 = time.perf_counter()
+        stats.publish_delay_latency = self.publish_delay_latency_recorder.get_interval_histogram()
+        t3 = time.perf_counter()
+        stats.end_to_end_latency = self.end_to_end_latency_recorder.get_interval_histogram()
+        t4 = time.perf_counter()
+
+        total_time = t4 - start
+        logger.info(f"⏱️  to_period_stats() took {total_time*1000:.1f}ms (pub: {(t2-t1)*1000:.1f}ms, delay: {(t3-t2)*1000:.1f}ms, e2e: {(t4-t3)*1000:.1f}ms)")
 
         return stats
 
@@ -151,9 +166,11 @@ class WorkerStats:
         :return: CumulativeLatencies instance
         """
         latencies = CumulativeLatencies()
-        latencies.publish_latency = self._get_interval_histogram(self.cumulative_publish_latency_recorder)
-        latencies.publish_delay_latency = self._get_interval_histogram(self.cumulative_publish_delay_latency_recorder)
-        latencies.end_to_end_latency = self._get_interval_histogram(self.end_to_end_cumulative_latency_recorder)
+        # 直接返回累积直方图的拷贝（需要锁保护读取）
+        with self.histogram_lock:
+            latencies.publish_latency = self._copy_histogram(self.cumulative_publish_latency)
+            latencies.publish_delay_latency = self._copy_histogram(self.cumulative_publish_delay_latency)
+            latencies.end_to_end_latency = self._copy_histogram(self.cumulative_end_to_end_latency)
         return latencies
 
     def to_counters_stats(self) -> CountersStats:
@@ -170,12 +187,16 @@ class WorkerStats:
 
     def reset_latencies(self):
         """Reset all latency recorders."""
-        self.publish_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
-        self.cumulative_publish_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
-        self.publish_delay_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
-        self.cumulative_publish_delay_latency_recorder = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
-        self.end_to_end_latency_recorder = HdrHistogram(1, 12 * 60 * 60 * 1_000_000, 5)
-        self.end_to_end_cumulative_latency_recorder = HdrHistogram(1, 12 * 60 * 60 * 1_000_000, 5)
+        # 重置Recorders（周期统计）
+        self.publish_latency_recorder.reset()
+        self.publish_delay_latency_recorder.reset()
+        self.end_to_end_latency_recorder.reset()
+
+        # 重置累积直方图
+        with self.histogram_lock:
+            self.cumulative_publish_latency = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+            self.cumulative_publish_delay_latency = HdrHistogram(1, self.HIGHEST_TRACKABLE_VALUE, 5)
+            self.cumulative_end_to_end_latency = HdrHistogram(1, 12 * 60 * 60 * 1_000, 5)  # 12 hours in ms
 
     def reset(self):
         """Reset all statistics."""
@@ -212,29 +233,33 @@ class WorkerStats:
         self.bytes_sent.add(payload_length)
         self.total_bytes_sent.add(payload_length)
 
-        # Calculate latency in microseconds
-        latency_micros = min(self.HIGHEST_TRACKABLE_VALUE, (now_ns - send_time_ns) // 1000)
-        send_delay_micros = min(self.HIGHEST_TRACKABLE_VALUE, (send_time_ns - intended_send_time_ns) // 1000)
+        # Calculate latency in milliseconds
+        latency_millis = min(self.HIGHEST_TRACKABLE_VALUE, (now_ns - send_time_ns) // 1_000_000)
+        send_delay_millis = min(self.HIGHEST_TRACKABLE_VALUE, (send_time_ns - intended_send_time_ns) // 1_000_000)
 
+        # Recorder内部已有锁，不需要额外加锁
+        self.publish_latency_recorder.record_value(latency_millis)
+        self.publish_delay_latency_recorder.record_value(send_delay_millis)
+
+        # 同时记录到cumulative histograms（需要锁保护）
         with self.histogram_lock:
-            self.publish_latency_recorder.record_value(latency_micros)
-            self.cumulative_publish_latency_recorder.record_value(latency_micros)
-            self.publish_delay_latency_recorder.record_value(send_delay_micros)
-            self.cumulative_publish_delay_latency_recorder.record_value(send_delay_micros)
+            self.cumulative_publish_latency.record_value(latency_millis)
+            self.cumulative_publish_delay_latency.record_value(send_delay_millis)
 
-    def _get_interval_histogram(self, recorder: HdrHistogram) -> HdrHistogram:
+    def _copy_histogram(self, histogram: HdrHistogram) -> HdrHistogram:
         """
-        Get interval histogram (simulates Java Recorder.getIntervalHistogram()).
+        Create a copy of a histogram (used for cumulative latencies).
 
-        :param recorder: The recorder
-        :return: A copy of the current histogram
+        :param histogram: The histogram to copy
+        :return: A copy of the histogram
         """
-        with self.histogram_lock:
-            # Use encode/decode for thread-safe copy
-            encoded = recorder.encode()
-            copy = HdrHistogram.decode(encoded)
-
-            # Reset the original recorder for next interval
-            recorder.reset()
-
-        return copy
+        # 使用encode/decode复制（调用者需要确保加锁）
+        try:
+            encoded = histogram.encode()
+            return HdrHistogram.decode(encoded)
+        except Exception as e:
+            # If copy fails, return empty histogram
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to copy histogram: {e}, returning empty histogram")
+            return HdrHistogram(1, 60 * 1_000, 5)  # 60 seconds in ms

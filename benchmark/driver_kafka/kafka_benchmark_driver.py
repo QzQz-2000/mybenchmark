@@ -1,17 +1,6 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import yaml
 import os
+import threading
 from typing import List
 from concurrent.futures import Future
 from confluent_kafka.admin import AdminClient, NewTopic
@@ -40,6 +29,7 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
         self.consumer_properties = {}
         self.admin = None
         self.created_topics = []  # Track created topics for cleanup
+        self._topics_lock = threading.Lock()  # Lock for thread-safe topic list access
 
     def initialize(self, configuration_file: str, stats_logger):
         """Initialize Kafka driver."""
@@ -97,17 +87,34 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
         topic_info = TopicInfo(topic, partitions)
         return self.create_topics([topic_info])
 
-    def create_topics(self, topic_infos: List[TopicInfo]) -> Future:
-        """Create multiple topics - synchronous execution."""
-        import concurrent.futures
+    def create_topics(self, topic_infos: List) -> Future:
+        """Create multiple topics - synchronous execution.
 
+        Args:
+            topic_infos: List of TopicInfo objects OR dicts with 'topic' and 'partitions' keys
+        """
+        import concurrent.futures
+        import logging
+
+        logger = logging.getLogger(__name__)
         future = concurrent.futures.Future()
 
         try:
+            # Handle both TopicInfo objects and dicts
+            def get_topic_name(info):
+                return info.topic if hasattr(info, 'topic') else info['topic']
+
+            def get_partitions(info):
+                return info.partitions if hasattr(info, 'partitions') else info['partitions']
+
+            topic_names = [get_topic_name(info) for info in topic_infos]
+            logger.info(f"📝 Starting creation of {len(topic_infos)} topics: {topic_names}")
+            logger.info(f"📝 Topic config properties: {self.topic_properties}")
+
             new_topics = [
                 NewTopic(
-                    topic_info.topic,
-                    num_partitions=topic_info.partitions,
+                    get_topic_name(topic_info),
+                    num_partitions=get_partitions(topic_info),
                     replication_factor=self.config.replication_factor,
                     config=self.topic_properties
                 )
@@ -118,21 +125,80 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
             fs = self.admin.create_topics(new_topics)
 
             # Wait for all topics to be created
+            created_count = 0
+            already_exists_count = 0
             for topic, f in fs.items():
                 try:
                     f.result()  # Block until topic is created
-                    # Track created topic for cleanup
-                    self.created_topics.append(topic)
-                except Exception as e:
-                    # Topic might already exist, which is fine
-                    if "already exists" not in str(e):
-                        raise
-                    else:
-                        # Still track it if it already exists
+                    partitions = get_partitions([info for info in topic_infos if get_topic_name(info) == topic][0])
+                    logger.info(f"✅ Created topic: {topic} (partitions={partitions}, replication={self.config.replication_factor})")
+                    created_count += 1
+                    # Track created topic for cleanup (thread-safe)
+                    with self._topics_lock:
                         self.created_topics.append(topic)
+                except Exception as e:
+                    error_msg = str(e)
+                    # Topic正在删除中 - 需要抛出异常让上层重试
+                    if "marked for deletion" in error_msg:
+                        logger.error(f"❌ Failed to create topic {topic}: {e}")
+                        raise
+                    # Topic已经存在（且不是正在删除），这是正常情况
+                    elif "already exists" in error_msg:
+                        logger.info(f"⚠️  Topic {topic} already exists, skipping creation")
+                        already_exists_count += 1
+                        # Still track it if it already exists (thread-safe)
+                        with self._topics_lock:
+                            self.created_topics.append(topic)
+                    else:
+                        # 其他错误
+                        logger.error(f"❌ Failed to create topic {topic}: {e}")
+                        raise
 
+            logger.info(f"📝 Topic creation complete: {created_count} created, {already_exists_count} already existed")
             future.set_result(None)
         except Exception as e:
+            logger.error(f"❌ Failed to create topics: {e}")
+            future.set_exception(e)
+
+        return future
+
+    def delete_topics(self, topic_names: List[str]) -> Future:
+        """Delete multiple topics."""
+        import concurrent.futures
+        import logging
+
+        logger = logging.getLogger(__name__)
+        future = concurrent.futures.Future()
+
+        try:
+            if not topic_names:
+                logger.info("🗑️  No topics to delete (empty list)")
+                future.set_result(None)
+                return future
+
+            logger.info(f"🗑️  Starting deletion of {len(topic_names)} topics: {topic_names}")
+
+            # Delete topics
+            fs = self.admin.delete_topics(topic_names, operation_timeout=30)
+
+            # Wait for all to complete
+            deleted_count = 0
+            for topic, f in fs.items():
+                try:
+                    f.result()  # Wait for the result
+                    logger.info(f"✅ Deleted topic: {topic}")
+                    deleted_count += 1
+                except Exception as e:
+                    # Ignore if topic doesn't exist
+                    if 'UnknownTopicOrPartitionException' in str(e) or 'UNKNOWN_TOPIC_OR_PARTITION' in str(e):
+                        logger.info(f"⚠️  Topic {topic} does not exist, skipping")
+                    else:
+                        logger.warning(f"⚠️  Error deleting topic {topic}: {e}")
+
+            logger.info(f"🗑️  Deletion complete: {deleted_count}/{len(topic_names)} topics deleted")
+            future.set_result(None)
+        except Exception as e:
+            logger.error(f"❌ Failed to delete topics: {e}")
             future.set_exception(e)
 
         return future
@@ -221,29 +287,38 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
 
         return future
 
-    def delete_topics(self):
-        """Delete all created topics."""
+    def delete_all_created_topics(self):
+        """Delete all created topics (for cleanup in close())."""
         import logging
         logger = logging.getLogger(__name__)
 
-        if not self.created_topics:
-            return
+        with self._topics_lock:
+            if not self.created_topics:
+                logger.info("🗑️  No topics to delete (list is empty)")
+                return
+
+            topics_to_delete = self.created_topics[:]
 
         try:
-            logger.info(f"Deleting {len(self.created_topics)} topics: {self.created_topics}")
-            fs = self.admin.delete_topics(self.created_topics, operation_timeout=30)
+            logger.info(f"🗑️  Deleting {len(topics_to_delete)} topics: {topics_to_delete}")
+            fs = self.admin.delete_topics(topics_to_delete, operation_timeout=30)
 
             # Wait for deletion to complete
+            deleted_count = 0
             for topic, f in fs.items():
                 try:
                     f.result()
-                    logger.info(f"Successfully deleted topic: {topic}")
+                    logger.info(f"✅ Successfully deleted topic: {topic}")
+                    deleted_count += 1
                 except Exception as e:
-                    logger.warning(f"Failed to delete topic {topic}: {e}")
+                    logger.warning(f"⚠️  Failed to delete topic {topic}: {e}")
 
-            self.created_topics.clear()
+            logger.info(f"🗑️  Deletion complete: {deleted_count}/{len(topics_to_delete)} topics deleted")
+
+            with self._topics_lock:
+                self.created_topics.clear()
         except Exception as e:
-            logger.error(f"Error deleting topics: {e}")
+            logger.error(f"❌ Error deleting topics: {e}")
 
     def close(self):
         """Close all resources and cleanup topics."""
@@ -268,7 +343,7 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
         self.consumers.clear()
 
         # Delete created topics for idempotency
-        self.delete_topics()
+        self.delete_all_created_topics()
 
     @staticmethod
     def _parse_properties_confluent(config_str: str) -> dict:

@@ -27,12 +27,12 @@ class PeriodStats:
         self.total_message_send_errors = 0
         self.total_messages_received = 0
 
-        # 60 seconds in microseconds, 5 significant digits
-        self.publish_latency = HdrHistogram(1, 60 * 1_000_000, 5)
-        # 60 seconds in microseconds, 5 significant digits
-        self.publish_delay_latency = HdrHistogram(1, 60 * 1_000_000, 5)
-        # 12 hours in microseconds, 5 significant digits
-        self.end_to_end_latency = HdrHistogram(1, 12 * 60 * 60 * 1_000_000, 5)
+        # 60 seconds in milliseconds, 5 significant digits
+        self.publish_latency = HdrHistogram(1, 60 * 1_000, 5)
+        # 60 seconds in milliseconds, 5 significant digits
+        self.publish_delay_latency = HdrHistogram(1, 60 * 1_000, 5)
+        # 12 hours in milliseconds, 5 significant digits
+        self.end_to_end_latency = HdrHistogram(1, 12 * 60 * 60 * 1_000, 5)
 
     def plus(self, to_add: 'PeriodStats') -> 'PeriodStats':
         result = PeriodStats()

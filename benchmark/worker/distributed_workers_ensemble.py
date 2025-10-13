@@ -1,15 +1,3 @@
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import logging
 from typing import List
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,7 +27,8 @@ class DistributedWorkersEnsemble(Worker):
         """
         self.workers = workers
         self.extra_consumers = extra_consumers
-        self.executor = ThreadPoolExecutor(max_workers=len(workers) * 2, thread_name_prefix="distributed-worker")
+        # 只需要 len(workers) 个线程，每个worker一个线程即可
+        self.executor = ThreadPoolExecutor(max_workers=max(1, len(workers)), thread_name_prefix="distributed-worker")
 
     def _execute_on_all_workers(self, func_name: str, *args, **kwargs):
         """

@@ -21,6 +21,7 @@ class BenchmarkProducer(ABC):
     Equivalent to AutoCloseable in Java.
     """
 
+    # 异步发送消息
     @abstractmethod
     def send_async(self, key: Optional[str], payload: bytes) -> Future:
         """

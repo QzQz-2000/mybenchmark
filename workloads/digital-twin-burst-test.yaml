@@ -1,0 +1,27 @@
+# Digital Twin Burst Load Test
+# Simulates sudden spikes in sensor data (e.g., equipment anomalies)
+
+name: Digital Twin Burst Test / 50K msg/s peaks
+description: "Tests system behavior during sensor data bursts (equipment failures, anomalies)"
+
+# High-intensity burst configuration
+topics: 4                           # Fewer topics for concentrated load
+partitionsPerTopic: 32              # More partitions per topic for burst handling
+keyDistributor: "RANDOM"            # Random distribution for burst scenarios
+
+# Larger messages during burst events (more diagnostic data)
+messageSize: 2048                   # 2KB messages with extended diagnostic info
+payloadFile: null
+
+# Burst producer configuration
+producersPerTopic: 50               # 200 total producers
+producerRate: 250                   # 250 msg/s per producer = 50K total msg/s
+
+# Consumer configuration for burst handling
+subscriptionsPerTopic: 1            # Single consumer group for burst processing
+consumerPerSubscription: 16         # Many consumers for parallel burst processing
+consumerBacklogSizeGB: 0            # Handle bursts in real-time
+
+# Shorter test duration for burst scenarios
+testDurationMinutes: 5              # 5 minutes burst test
+warmupDurationMinutes: 1            # Quick warmup
