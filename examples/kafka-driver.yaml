@@ -1,5 +1,5 @@
 name: Kafka
-driverClass: benchmark.driver_kafka.kafka_benchmark_driver.KafkaBenchmarkDriver
+driverClass: benchmark.drivers.kafka.kafka_benchmark_driver.KafkaBenchmarkDriver
 
 # Replication factor for Kafka topics
 replicationFactor: 1

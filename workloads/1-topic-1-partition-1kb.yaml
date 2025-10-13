@@ -1,15 +1,15 @@
 name: Consumer Scaling Test
 
 topics: 1
-partitionsPerTopic: 1       # 足够的分区支持多个consumer
+partitionsPerTopic: 10       # 足够的分区支持多个consumer
 keyDistributor: "NO_KEY"
-messageSize: 204            # 直接用messageSize生成payload
+messageSize: 1024            # 直接用messageSize生成payload
 
 producersPerTopic: 1
-producerRate: 100000          # 总共 40K msg/s
+producerRate: 1000          # 总共 40K msg/s
 
 # 测试不同Consumer数量
-consumerPerSubscription: 1
+consumerPerSubscription: 10
 subscriptionsPerTopic: 1     # 单个consumer group
 
 testDurationMinutes: 1

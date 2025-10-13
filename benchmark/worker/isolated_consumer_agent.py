@@ -166,11 +166,6 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                             'e2e_latency_histogram_encoded': local_stats.e2e_latency_histogram.encode(),
                         }
 
-                        # 报告histogram统计（前5秒和有数据时）
-                        hist_count = local_stats.e2e_latency_histogram.get_total_count()
-                        if message_count < 5000 or hist_count > 0:
-                            logger.info(f"Consumer Agent {agent_id} reporting: msgs={local_stats.messages_received}, e2e_count={hist_count}, epoch={current_epoch}")
-
                         # 使用带超时的put，避免队列满时阻塞
                         queue_put_success = False
                         try:
