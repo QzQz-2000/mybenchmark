@@ -3,14 +3,58 @@ name: Consumer Scaling Test
 topics: 1
 partitionsPerTopic: 10       # 足够的分区支持多个consumer
 keyDistributor: "NO_KEY"
-messageSize: 1024            # 直接用messageSize生成payload
+messageSize: 5000            # 直接用messageSize生成payload
 
-producersPerTopic: 1
-producerRate: 1000          # 总共 40K msg/s
+producersPerTopic: 8
+producerRate: 5000          # 总共 40K msg/s
 
 # 测试不同Consumer数量
 consumerPerSubscription: 10
-subscriptionsPerTopic: 1     # 单个consumer group
+subscriptionsPerTopic: 1    # 单个consumer group
 
 testDurationMinutes: 1
-warmupDurationMinutes: 1
+warmupDurationMinutes: 0
+
+
+
+# ================================================================================
+# FILE-BASED STATISTICS SUMMARY
+# ================================================================================
+# Total Consumers:     10
+# Total Messages:      310,550
+# Histogram Samples:   310,550
+
+# End-to-End Latency:
+#   Average:           1257.15 ms
+#   Maximum:           6825 ms
+
+# Percentiles:
+#   p50:               942 ms
+#   p75:               1550 ms
+#   p90:               2494 ms
+#   p95:               3511 ms
+#   p99:               5338 ms
+#   p99.9:             6388 ms
+#   p99.99:            6645 ms
+# ================================================================================
+
+# ================================================================================
+# FILE-BASED STATISTICS SUMMARY
+# ================================================================================
+# Total Consumers:     1
+# Total Messages:      309,700
+# Histogram Samples:   309,700
+
+# End-to-End Latency:
+#   Average:           518.37 ms
+#   Maximum:           3053 ms
+
+# Percentiles:
+#   p50:               435 ms
+#   p75:               673 ms
+#   p90:               962 ms
+#   p95:               1163 ms
+#   p99:               1743 ms
+#   p99.9:             2505 ms
+#   p99.99:            2960 ms
+# ================================================================================

@@ -1,0 +1,78 @@
+# config.yml
+---
+startDelaySeconds: 0
+# JMX Exporter 将连接到 Kafka Broker 容器内的 9999 端口
+hostPort: kafka:9999
+ssl: false
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+rules:
+  # ----------------------------------------------------
+  # Kafka 核心业务指标 (Broker 吞吐量、请求延迟等)
+  # ----------------------------------------------------
+  
+  # 吞吐量（BytesIn/Out Per Sec）
+  - pattern: "kafka.server<type=(BrokerTopicMetrics), name=(BytesInPerSec|BytesOutPerSec|TotalProduceRequestsPerSec|TotalFetchRequestsPerSec)><>Count"
+    name: kafka_server_brokertopicmetrics_$2_total
+    type: COUNTER
+    
+  # 请求处理器线程池相关指标
+  - pattern: "kafka.network<type=RequestMetrics, name=(RequestsPerSec|TotalTimeMs), request=(\\w+), (?:serviceLevel|version)=(\\w+)><>Count"
+    name: kafka_network_requestmetrics_$1_total
+    labels:
+      request: "$2"
+      service_level: "$3"
+    type: COUNTER
+    
+  # 请求队列指标
+  - pattern: "kafka.network<type=RequestQueue, name=(RequestQueueSize)><>Value"
+    name: kafka_network_requestqueue_$1
+    type: GAUGE
+    
+  # 备份/同步指标 (ISR)
+  - pattern: "kafka.server<type=ReplicaManager, name=(IsrExpandsPerSec|IsrShrinksPerSec|LeaderElectionRateAndTimeMs)><>Count"
+    name: kafka_server_replicamanager_$1_total
+    type: COUNTER
+
+  # 分区和副本状态
+  - pattern: "kafka.server<type=ReplicaManager, name=(PartitionCount|LeaderCount|OfflineReplicaCount)><>Value"
+    name: kafka_server_replicamanager_$1
+    type: GAUGE
+    
+  # ----------------------------------------------------
+  # Kafka Log 指标 (Log Size, Offset)
+  # ----------------------------------------------------
+  - pattern: "kafka.log<type=Log, name=(LogEndOffset|LogStartOffset|Size), topic=\"(.+)\", partition=\"([0-9]+)\"><>Value"
+    name: kafka_log_$1
+    labels:
+      topic: "$2"
+      partition: "$3"
+    type: GAUGE
+      
+  # ----------------------------------------------------
+  # JVM 基础指标 (内存, CPU, GC)
+  # ----------------------------------------------------
+
+  # JVM 堆内存使用情况
+  - pattern: "java.lang<type=Memory><HeapMemoryUsage>(\\w+)"
+    name: kafka_jvm_heap_memory_$1
+    type: GAUGE
+
+  # JVM CPU 负载 (进程级别)
+  - pattern: "java.lang<type=OperatingSystem><>ProcessCpuLoad"
+    name: kafka_jvm_cpu_load
+    type: GAUGE
+
+  # 垃圾回收计数
+  - pattern: "java.lang<type=GarbageCollector, name=(.+)?><CollectionCount>(\\d+)"
+    name: kafka_jvm_gc_collection_count
+    labels:
+      name: "$1"
+    value: "$2"
+    type: COUNTER
+    
+  # 线程数
+  - pattern: "java.lang<type=Threading><>ThreadCount"
+    name: kafka_jvm_thread_count
+    type: GAUGE

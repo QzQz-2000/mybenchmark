@@ -288,6 +288,9 @@ class LocalWorker(Worker):
             producer_worker_func = isolated_agent_worker
             consumer_worker_func = isolated_consumer_agent
 
+        # 清理旧的统计文件（文件输出模式）
+        self._cleanup_old_stats_files()
+
         # 启动统计收集线程
         self._start_stats_collector()
 
@@ -418,6 +421,40 @@ class LocalWorker(Worker):
 
         if ready_count < total_agents:
             logger.warning(f"Warning: Only {ready_count}/{total_agents} Agents reported ready (timeout or crash)")
+
+    def _cleanup_old_stats_files(self):
+        """清理旧的统计文件（每次测试开始时调用）"""
+        from pathlib import Path
+        stats_dir = Path("/tmp/kafka_benchmark_stats")
+
+        if not stats_dir.exists():
+            logger.info("Stats directory does not exist, no cleanup needed")
+            return
+
+        deleted = 0
+        try:
+            # 删除所有 .pkl 文件
+            for stats_file in stats_dir.glob("*.pkl"):
+                try:
+                    stats_file.unlink()
+                    deleted += 1
+                except Exception as e:
+                    logger.warning(f"Failed to delete {stats_file}: {e}")
+
+            # 删除所有 .tmp 文件
+            for temp_file in stats_dir.glob("*.tmp"):
+                try:
+                    temp_file.unlink()
+                    deleted += 1
+                except Exception as e:
+                    logger.warning(f"Failed to delete {temp_file}: {e}")
+
+            if deleted > 0:
+                logger.info(f"Cleaned up {deleted} old stats files from {stats_dir}")
+            else:
+                logger.info("No old stats files to clean up")
+        except Exception as e:
+            logger.error(f"Error cleaning up stats files: {e}")
 
     def _start_stats_collector(self):
         """启动统计收集线程（从Agent进程收集统计）"""

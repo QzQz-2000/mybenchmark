@@ -105,3 +105,8 @@ docker run -it \
 python -m benchmark.benchmark \
       -d examples/pulsar-driver.yaml \
       workloads/1-topic-1-partition-1kb.yaml
+
+
+python -m benchmark.benchmark \
+      -d examples/kafka-driver.yaml \
+      workloads/1-topic-1-partition-1kb.yaml
