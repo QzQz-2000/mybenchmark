@@ -5,15 +5,15 @@ partitionsPerTopic: 10       # 足够的分区支持多个consumer
 keyDistributor: "NO_KEY"
 messageSize: 5000            # 直接用messageSize生成payload
 
-producersPerTopic: 8
+producersPerTopic: 1
 producerRate: 5000          # 总共 40K msg/s
 
 # 测试不同Consumer数量
-consumerPerSubscription: 10
+consumerPerSubscription: 1
 subscriptionsPerTopic: 1    # 单个consumer group
 
 testDurationMinutes: 1
-warmupDurationMinutes: 0
+warmupDurationMinutes: 2  # ✅ 增加到2分钟，让 Consumer Group 充分稳定
 
 
 

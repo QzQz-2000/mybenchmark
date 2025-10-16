@@ -28,7 +28,10 @@ logger = logging.getLogger(__name__)
 class FileStatsReader:
     """读取和聚合基于文件的统计数据"""
 
-    def __init__(self, stats_dir: str = "/tmp/kafka_benchmark_stats"):
+    def __init__(self, stats_dir: str = None):
+        # ✅ 默认使用当前工作目录下的 benchmark_results 文件夹
+        if stats_dir is None:
+            stats_dir = Path.cwd() / "benchmark_results"
         self.stats_dir = Path(stats_dir)
 
     def read_consumer_stats(self, consumer_ids: Optional[List[int]] = None) -> Dict:

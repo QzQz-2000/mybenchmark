@@ -110,3 +110,46 @@ python -m benchmark.benchmark \
 python -m benchmark.benchmark \
       -d examples/kafka-driver.yaml \
       workloads/1-topic-1-partition-1kb.yaml
+
+
+================================================================================
+FILE-BASED STATISTICS SUMMARY
+================================================================================
+Total Consumers:     10
+Total Messages:      1,040,963
+Histogram Samples:   308,994
+
+End-to-End Latency:
+  Average:           202.24 ms
+  Maximum:           1335 ms
+
+Percentiles:
+  p50:               135 ms
+  p75:               260 ms
+  p90:               449 ms
+  p95:               596 ms
+  p99:               967 ms
+  p99.9:             1135 ms
+  p99.99:            1290 ms
+================================================================================
+
+================================================================================
+FILE-BASED STATISTICS SUMMARY
+================================================================================
+Total Consumers:     1
+Total Messages:      1,013,112
+Histogram Samples:   306,800
+
+End-to-End Latency:
+  Average:           77.39 ms
+  Maximum:           275 ms
+
+Percentiles:
+  p50:               75 ms
+  p75:               104 ms
+  p90:               134 ms
+  p95:               158 ms
+  p99:               196 ms
+  p99.9:             246 ms
+  p99.99:            273 ms
+================================================================================

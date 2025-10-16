@@ -341,6 +341,9 @@ class LocalWorker(Worker):
         logger.info(f"Started {num_producer_agents} Producer Agent processes")
 
         # 2. 为每个Consumer创建独立的Agent进程 (V2新增)
+        # ✅ 优化：延迟启动，减少 Consumer Group Rebalance 风暴
+        consumer_start_delay_ms = 150  # 每个 consumer 启动间隔 150ms
+
         for i, consumer_meta in enumerate(self.consumer_metadata):
             if is_pulsar:
                 # Pulsar consumer agent arguments
@@ -380,6 +383,11 @@ class LocalWorker(Worker):
 
             process.start()
             self.agent_processes.append(process)
+
+            # ✅ 延迟启动：避免所有 consumer 同时加入 group，减少 rebalance 次数
+            if i < len(self.consumer_metadata) - 1:  # 最后一个不需要等待
+                time.sleep(consumer_start_delay_ms / 1000.0)
+                logger.debug(f"Started Consumer Agent {i}, waiting {consumer_start_delay_ms}ms before next...")
 
         logger.info(f"Started {num_consumer_agents} Consumer Agent processes")
         logger.info(f"Total: {len(self.agent_processes)} Agent processes running")
@@ -421,6 +429,19 @@ class LocalWorker(Worker):
 
         if ready_count < total_agents:
             logger.warning(f"Warning: Only {ready_count}/{total_agents} Agents reported ready (timeout or crash)")
+
+        # ✅ 优化：等待 Consumer Group Rebalance 完全稳定
+        # 当所有 consumer 加入后，Kafka 需要时间完成最终的分区分配和稳定
+        if num_consumer_agents > 0:
+            # 根据 consumer 数量动态调整等待时间
+            # 经验值：基础 5 秒 + 每个 consumer 0.3 秒
+            stabilization_time = 5.0 + (num_consumer_agents * 0.3)
+            logger.info(f"=" * 80)
+            logger.info(f"⏳ Waiting {stabilization_time:.1f}s for Consumer Group rebalance to stabilize...")
+            logger.info(f"   This ensures all consumers have settled on their partition assignments")
+            logger.info(f"=" * 80)
+            time.sleep(stabilization_time)
+            logger.info("✅ Consumer Group should now be stable, ready for workload")
 
     def _cleanup_old_stats_files(self):
         """清理旧的统计文件（每次测试开始时调用）"""

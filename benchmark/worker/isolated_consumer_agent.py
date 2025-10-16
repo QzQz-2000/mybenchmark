@@ -53,8 +53,37 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
         consumer_config['client.id'] = f'consumer-agent-{agent_id}'
         consumer = Consumer(consumer_config)
 
-        # 2. 订阅topic
-        consumer.subscribe([topic])
+        # 1.5 定义 Rebalance Callback（用于监控和调试）
+        rebalance_count = {'count': 0, 'last_time': time.time()}
+
+        def on_assign(consumer, partitions):
+            """当分区被分配给这个 consumer 时调用"""
+            rebalance_count['count'] += 1
+            rebalance_count['last_time'] = time.time()
+            partition_ids = [p.partition for p in partitions]
+            logger.info(
+                f"🔄 Consumer Agent {agent_id} REBALANCE #{rebalance_count['count']}: "
+                f"Assigned {len(partitions)} partitions: {partition_ids}"
+            )
+
+        def on_revoke(consumer, partitions):
+            """当分区从这个 consumer 撤销时调用"""
+            partition_ids = [p.partition for p in partitions]
+            logger.info(
+                f"⚠️  Consumer Agent {agent_id} REBALANCE: "
+                f"Revoked {len(partitions)} partitions: {partition_ids}"
+            )
+
+        def on_lost(consumer, partitions):
+            """当分区丢失时调用（如超时）"""
+            partition_ids = [p.partition for p in partitions]
+            logger.warning(
+                f"❌ Consumer Agent {agent_id} PARTITION LOST: "
+                f"Lost {len(partitions)} partitions: {partition_ids}"
+            )
+
+        # 2. 订阅topic（带 rebalance callback）
+        consumer.subscribe([topic], on_assign=on_assign, on_revoke=on_revoke, on_lost=on_lost)
         logger.info(f"Consumer Agent {agent_id} subscribed to topic: {topic}, group: {subscription_name}")
 
         # 3. 本地统计对象（进程内独立）
@@ -93,19 +122,22 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
         import os
         import pickle
         from pathlib import Path
-        stats_dir = Path("/tmp/kafka_benchmark_stats")
+        # ✅ 使用相对路径，在当前工作目录下创建 benchmark_results 文件夹
+        stats_dir = Path.cwd() / "benchmark_results"
         stats_dir.mkdir(parents=True, exist_ok=True)
         stats_file = stats_dir / f"consumer_{agent_id}_stats.pkl"
         last_file_write = time.time()
         file_write_interval = 5  # 每5秒写一次文件
 
         # 5. Consumer主循环
-        message_count = 0
+        message_count = 0  # 总消息计数（用于日志）
+        test_message_count = 0  # 测试阶段消息计数（用于统计文件）
 
         while not stop_event.is_set():
             try:
-                # 5.1 批量Poll消息（一次最多100条，timeout 1秒）
-                messages = consumer.consume(num_messages=100, timeout=1.0)
+                # 5.1 批量Poll消息（一次最多100条，timeout 100ms）
+                # ✅ 优化：减少 timeout 从 1秒到 100ms，降低延迟
+                messages = consumer.consume(num_messages=100, timeout=0.1)
 
                 if not messages:
                     # 没有消息，继续
@@ -123,7 +155,8 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                             continue
 
                         # 成功接收消息
-                        message_count += 1
+                        message_count += 1  # 总计数（含warmup）
+                        test_message_count += 1  # 测试阶段计数
                         local_stats.messages_received += 1
 
                         # 从 payload 中提取时间戳（前8字节）
@@ -162,6 +195,8 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                             local_stats.messages_received = 0
                             local_stats.bytes_received = 0
                             local_stats.reset_histogram()
+                            # ✅ 重置测试阶段消息计数（与histogram保持同步）
+                            test_message_count = 0
 
                     last_epoch_check = now
 
@@ -202,9 +237,10 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                 if now - last_file_write >= file_write_interval:
                     try:
                         # 写入累积统计到文件
+                        # ✅ 使用 test_message_count（仅测试阶段）而非 message_count（含warmup）
                         file_data = {
                             'agent_id': agent_id,
-                            'total_messages_received': message_count,
+                            'total_messages_received': test_message_count,
                             'e2e_latency_histogram_encoded': local_stats.e2e_latency_histogram.encode(),
                             'timestamp': now,
                             'epoch': current_epoch
@@ -247,10 +283,11 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
             logger.error(f"Consumer Agent {agent_id} error closing consumer: {e}")
 
         # 7. 写入最终统计到文件
+        # ✅ 使用 test_message_count（仅测试阶段）而非 message_count（含warmup）
         try:
             final_file_data = {
                 'agent_id': agent_id,
-                'total_messages_received': message_count,
+                'total_messages_received': test_message_count,
                 'e2e_latency_histogram_encoded': local_stats.e2e_latency_histogram.encode(),
                 'timestamp': time.time(),
                 'epoch': current_epoch,
