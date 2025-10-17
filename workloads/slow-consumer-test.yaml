@@ -1,0 +1,22 @@
+# workloads/slow-consumer-test.yaml
+# 测试慢速消费者和并行度的影响
+name: Slow Consumer Parallelism Test
+
+topics: 1
+partitionsPerTopic: 4
+messageSize: 1024
+
+producersPerTopic: 2
+producerRate: 100          # 固定速率：100 msg/s per producer (总共 200 msg/s)
+
+subscriptionsPerTopic: 1
+consumerPerSubscription: 2  # 2个消费者并行处理
+
+# 慢速消费者配置
+# 每条消息处理延迟 100ms，模拟慢速消费场景
+# 实际延迟 = 批量消息数 * messageProcessingDelayMs
+# 例如：批量拉取10条消息，延迟 = 10 * 100ms = 1秒
+messageProcessingDelayMs: 100
+
+testDurationMinutes: 2
+warmupDurationMinutes: 0

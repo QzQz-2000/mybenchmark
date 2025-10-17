@@ -71,6 +71,7 @@ class LocalWorker(Worker):
         # ISOLATED模式核心组件
         self.agent_processes = []  # Agent进程列表
         self.stop_agents = multiprocessing.Event()  # Agent停止信号
+        self.pause_consumers_event = multiprocessing.Event()  # Consumer暂停信号（用于backlog模式）
         # 队列容量设置（考虑macOS系统限制：信号量上限32767）
         # 设置为32000以保持跨平台兼容性
         # 容量计算：100个Agent * 每秒1次 * 320秒缓冲 = 32000
@@ -237,11 +238,14 @@ class LocalWorker(Worker):
         time.sleep(1.0)
         logger.info(f"Probe complete: sent {len(unique_topics)} messages to {len(unique_topics)} topics")
 
-    def start_load(self, producer_work_assignment: ProducerWorkAssignment):
+    def start_load(self, producer_work_assignment: ProducerWorkAssignment, message_processing_delay_ms: int = 0):
         """
         启动负载生成 - V2 ISOLATED模式
         为每个Producer创建一个独立的Agent进程
         为每个Consumer创建一个独立的Agent进程
+
+        :param producer_work_assignment: Producer工作分配配置
+        :param message_processing_delay_ms: 消息处理延迟（毫秒），用于模拟慢速消费者
         """
         if not self.producers and not self.consumer_metadata:
             logger.error("No producers or consumers registered, cannot start load")
@@ -375,7 +379,9 @@ class LocalWorker(Worker):
                         self.stop_agents,               # stop event
                         self.stats_queue,               # stats queue
                         self.reset_stats_flag,          # reset stats flag
-                        self.agent_ready_queue          # ready/error queue
+                        self.agent_ready_queue,         # ready/error queue
+                        self.pause_consumers_event,     # pause event (for backlog mode)
+                        message_processing_delay_ms     # message processing delay (for slow consumer simulation)
                     ),
                     name=f"kafka-consumer-agent-{i}",
                     daemon=False
@@ -625,32 +631,44 @@ class LocalWorker(Worker):
 
     def pause_consumers(self):
         """
-        Pause all consumers.
-        V2架构注意：Consumer在独立进程中，暂停功能当前未实现
-        如需实现，需要通过multiprocessing.Event通知Consumer Agent暂停poll
+        Pause all consumers (for backlog mode).
+
+        V2架构实现：通过 multiprocessing.Event 通知 Consumer Agent 暂停消费
+        Consumer Agent 会停止处理消息，但继续调用 poll(0) 维持心跳，避免被踢出 group
         """
         with self._lock:
             self.consumers_are_paused = True
+
             # V1兼容代码（当consumer_metadata为空且consumers有值时才执行）
             if not self.consumer_metadata and self.consumers:
                 for consumer in self.consumers:
                     consumer.pause()
+                logger.info("V1 架构: Paused all consumers")
             elif self.consumer_metadata:
-                logger.warning("V2 架构: pause_consumers() 暂未实现（Consumer在独立进程）")
+                # V2架构：设置暂停事件，通知所有Consumer Agent
+                self.pause_consumers_event.set()
+                logger.info(f"V2 架构: Set pause event for {len(self.consumer_metadata)} Consumer Agents")
+                logger.info("Consumer Agents will stop processing messages but maintain heartbeat")
 
     def resume_consumers(self):
         """
-        Resume all consumers.
-        V2架构注意：Consumer在独立进程中，恢复功能当前未实现
+        Resume all consumers (for backlog mode).
+
+        V2架构实现：清除 multiprocessing.Event，通知 Consumer Agent 恢复消费
         """
         with self._lock:
             self.consumers_are_paused = False
+
             # V1兼容代码
             if not self.consumer_metadata and self.consumers:
                 for consumer in self.consumers:
                     consumer.resume()
+                logger.info("V1 架构: Resumed all consumers")
             elif self.consumer_metadata:
-                logger.warning("V2 架构: resume_consumers() 暂未实现（Consumer在独立进程）")
+                # V2架构：清除暂停事件，通知所有Consumer Agent恢复
+                self.pause_consumers_event.clear()
+                logger.info(f"V2 架构: Cleared pause event for {len(self.consumer_metadata)} Consumer Agents")
+                logger.info("Consumer Agents will resume processing messages")
 
     def get_counters_stats(self) -> CountersStats:
         """Get counter statistics."""

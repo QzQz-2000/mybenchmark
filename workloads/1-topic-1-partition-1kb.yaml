@@ -1,21 +1,42 @@
 name: Consumer Scaling Test
 
 topics: 1
-partitionsPerTopic: 10       # 足够的分区支持多个consumer
+partitionsPerTopic: 100       # 足够的分区支持多个consumer
 keyDistributor: "NO_KEY"
-messageSize: 5000            # 直接用messageSize生成payload
+messageSize: 50000           # 直接用messageSize生成payload
 
 producersPerTopic: 1
-producerRate: 5000          # 总共 40K msg/s
+producerRate: 1000          # 总共 40K msg/s
+
+# # Backlog 配置
+consumerBacklogSizeGB: 2     # 构建 5GB 积压
+backlogDrainRatio: 1.0       # 1.0 = 完全排空，0.5 = 排空50%
 
 # 测试不同Consumer数量
 consumerPerSubscription: 1
 subscriptionsPerTopic: 1    # 单个consumer group
 
-testDurationMinutes: 1
+testDurationMinutes: 5
 warmupDurationMinutes: 2  # ✅ 增加到2分钟，让 Consumer Group 充分稳定
 
+# name: Backlog Performance Test
 
+# topics: 1
+# partitionsPerTopic: 16
+# messageSize: 1024
+
+# producersPerTopic: 4
+# producerRate: 10000          # 必须指定固定速率（不能用0自动探测）
+
+# subscriptionsPerTopic: 1
+# consumerPerSubscription: 2
+
+# # Backlog 配置
+# consumerBacklogSizeGB: 5     # 构建 5GB 积压
+# backlogDrainRatio: 1.0       # 1.0 = 完全排空，0.5 = 排空50%
+
+# testDurationMinutes: 10
+# warmupDurationMinutes: 1
 
 # ================================================================================
 # FILE-BASED STATISTICS SUMMARY

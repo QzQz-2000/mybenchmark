@@ -1,0 +1,20 @@
+# workloads/test-backlog.yaml
+name: Backlog Test
+
+topics: 1
+partitionsPerTopic: 4
+messageSize: 1024
+
+producersPerTopic: 2
+producerRate: 1000          # 固定速率：1000 msg/s per producer
+
+subscriptionsPerTopic: 1
+consumerPerSubscription: 2
+
+# Backlog 配置
+consumerBacklogSizeGB: 0.1  # 构建 100MB 积压
+backlogDrainRatio: 1.0      # 完全排空
+
+testDurationMinutes: 2
+warmupDurationMinutes: 0
+

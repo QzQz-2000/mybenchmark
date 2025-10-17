@@ -20,7 +20,8 @@ import time
 
 
 def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_config,
-                            stop_event, stats_queue, reset_flag, ready_queue):
+                            stop_event, stats_queue, reset_flag, ready_queue, pause_event=None,
+                            message_processing_delay_ms=0):
     """
     独立Consumer Agent进程工作函数 - ISOLATED模式
 
@@ -32,6 +33,8 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
     :param stats_queue: multiprocessing.Queue - 统计数据队列
     :param reset_flag: multiprocessing.Value - 重置标志（epoch计数器）
     :param ready_queue: multiprocessing.Queue - 就绪/错误信号队列
+    :param pause_event: multiprocessing.Event - 暂停信号（用于backlog模式，可选）
+    :param message_processing_delay_ms: 消息处理延迟（毫秒），用于模拟慢速消费者
     """
     # 设置进程级日志
     logger = logging.getLogger(f"consumer-agent-{agent_id}")
@@ -86,6 +89,11 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
         consumer.subscribe([topic], on_assign=on_assign, on_revoke=on_revoke, on_lost=on_lost)
         logger.info(f"Consumer Agent {agent_id} subscribed to topic: {topic}, group: {subscription_name}")
 
+        # 显示消息处理延迟配置
+        if message_processing_delay_ms > 0:
+            logger.info(f"Consumer Agent {agent_id} configured with message processing delay: {message_processing_delay_ms} ms per message")
+            logger.info(f"  → This simulates slow consumer (delay is proportional to batch size)")
+
         # 3. 本地统计对象（进程内独立）
         # 使用HdrHistogram替代list（与Java版本一致）
         class LocalStats:
@@ -118,23 +126,19 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
         last_epoch_check = time.time()
         current_epoch = reset_flag.value if reset_flag else 0
 
-        # 4.5 文件输出配置（双输出模式：Queue + File）
-        import os
-        import pickle
-        from pathlib import Path
-        # ✅ 使用相对路径，在当前工作目录下创建 benchmark_results 文件夹
-        stats_dir = Path.cwd() / "benchmark_results"
-        stats_dir.mkdir(parents=True, exist_ok=True)
-        stats_file = stats_dir / f"consumer_{agent_id}_stats.pkl"
-        last_file_write = time.time()
-        file_write_interval = 5  # 每5秒写一次文件
-
         # 5. Consumer主循环
         message_count = 0  # 总消息计数（用于日志）
-        test_message_count = 0  # 测试阶段消息计数（用于统计文件）
 
         while not stop_event.is_set():
             try:
+                # 5.0 检查是否暂停（backlog模式）
+                if pause_event and pause_event.is_set():
+                    # 🛑 暂停模式：不处理消息，但调用 poll(0) 维持心跳
+                    # 这样 consumer 仍然在 group 中，不会触发 rebalance
+                    _ = consumer.consume(num_messages=1, timeout=0.1)
+                    time.sleep(0.1)  # 暂停时降低 CPU 使用
+                    continue
+
                 # 5.1 批量Poll消息（一次最多100条，timeout 100ms）
                 # ✅ 优化：减少 timeout 从 1秒到 100ms，降低延迟
                 messages = consumer.consume(num_messages=100, timeout=0.1)
@@ -155,8 +159,7 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                             continue
 
                         # 成功接收消息
-                        message_count += 1  # 总计数（含warmup）
-                        test_message_count += 1  # 测试阶段计数
+                        message_count += 1
                         local_stats.messages_received += 1
 
                         # 从 payload 中提取时间戳（前8字节）
@@ -183,6 +186,14 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                             if message_count <= 5:
                                 logger.warning(f"Consumer Agent {agent_id} msg {message_count}: Payload too small ({len(payload) if payload else 0} bytes), cannot extract timestamp")
 
+                    # 5.1.5 应用消息处理延迟（模拟慢速消费者）
+                    # 方案 C：批量处理后按消息数量比例延迟
+                    if message_processing_delay_ms > 0 and messages:
+                        delay_seconds = len(messages) * (message_processing_delay_ms / 1000.0)
+                        time.sleep(delay_seconds)
+                        if message_count <= 105:  # 前几批显示日志
+                            logger.debug(f"Consumer Agent {agent_id} applied processing delay: {delay_seconds:.3f}s for {len(messages)} messages")
+
                 # 5.2 检查epoch重置（每秒检查一次）
                 now = time.time()
                 if now - last_epoch_check > 1.0:
@@ -195,67 +206,41 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                             local_stats.messages_received = 0
                             local_stats.bytes_received = 0
                             local_stats.reset_histogram()
-                            # ✅ 重置测试阶段消息计数（与histogram保持同步）
-                            test_message_count = 0
 
                     last_epoch_check = now
 
-                # 5.3 定期汇报统计（每秒一次）- 已注释，仅使用文件输出
-                # if now - last_stats_report >= 1.0:
-                #     try:
-                #         # 发送histogram编码数据（与Java版本一致）
-                #         # 注意：只发送周期计数器，histogram不重置（累积统计）
-                #         stats_dict = {
-                #             'agent_id': agent_id,
-                #             'type': 'consumer',
-                #             'messages_received': local_stats.messages_received,
-                #             'bytes_received': local_stats.bytes_received,
-                #             'timestamp': now,
-                #             'epoch': current_epoch,
-                #             # 发送编码后的histogram（累积数据，不重置）
-                #             'e2e_latency_histogram_encoded': local_stats.e2e_latency_histogram.encode(),
-                #         }
-                #
-                #         # 使用带超时的put，避免队列满时阻塞
-                #         try:
-                #             stats_queue.put(stats_dict, timeout=0.1)
-                #             # 只重置周期计数器，不重置histogram（histogram是累积的）
-                #             local_stats.messages_received = 0
-                #             local_stats.bytes_received = 0
-                #         except:
-                #             logger.warning(f"Consumer Agent {agent_id} stats queue full, dropping stats report")
-                #             # 即使队列满，也重置计数器避免重复计数
-                #             local_stats.messages_received = 0
-                #             local_stats.bytes_received = 0
-                #
-                #     except Exception as e:
-                #         logger.error(f"Consumer Agent {agent_id} failed to send stats: {e}", exc_info=True)
-                #
-                #     last_stats_report = now
-
-                # 5.4 定期写入文件（每5秒一次）
-                if now - last_file_write >= file_write_interval:
+                # 5.3 定期汇报统计（每秒一次）
+                if now - last_stats_report >= 1.0:
                     try:
-                        # 写入累积统计到文件
-                        # ✅ 使用 test_message_count（仅测试阶段）而非 message_count（含warmup）
-                        file_data = {
+                        # 发送histogram编码数据（与Java版本一致）
+                        # 注意：只发送周期计数器，histogram不重置（累积统计）
+                        stats_dict = {
                             'agent_id': agent_id,
-                            'total_messages_received': test_message_count,
-                            'e2e_latency_histogram_encoded': local_stats.e2e_latency_histogram.encode(),
+                            'type': 'consumer',
+                            'messages_received': local_stats.messages_received,
+                            'bytes_received': local_stats.bytes_received,
                             'timestamp': now,
-                            'epoch': current_epoch
+                            'epoch': current_epoch,
+                            # 发送编码后的histogram（累积数据，不重置）
+                            'e2e_latency_histogram_encoded': local_stats.e2e_latency_histogram.encode(),
                         }
 
-                        # 原子写入
-                        temp_file = stats_file.with_suffix('.tmp')
-                        with open(temp_file, 'wb') as f:
-                            pickle.dump(file_data, f)
-                        temp_file.rename(stats_file)
+                        # 使用带超时的put，避免队列满时阻塞
+                        try:
+                            stats_queue.put(stats_dict, timeout=0.1)
+                            # 只重置周期计数器，不重置histogram（histogram是累积的）
+                            local_stats.messages_received = 0
+                            local_stats.bytes_received = 0
+                        except:
+                            logger.warning(f"Consumer Agent {agent_id} stats queue full, dropping stats report")
+                            # 即使队列满，也重置计数器避免重复计数
+                            local_stats.messages_received = 0
+                            local_stats.bytes_received = 0
 
-                        logger.debug(f"Consumer Agent {agent_id} wrote stats to {stats_file}")
-                        last_file_write = now
                     except Exception as e:
-                        logger.error(f"Consumer Agent {agent_id} failed to write stats file: {e}", exc_info=True)
+                        logger.error(f"Consumer Agent {agent_id} failed to send stats: {e}", exc_info=True)
+
+                    last_stats_report = now
 
             except KeyboardInterrupt:
                 logger.info(f"Consumer Agent {agent_id} received keyboard interrupt, stopping...")
@@ -282,33 +267,17 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
         except Exception as e:
             logger.error(f"Consumer Agent {agent_id} error closing consumer: {e}")
 
-        # 7. 写入最终统计到文件
-        # ✅ 使用 test_message_count（仅测试阶段）而非 message_count（含warmup）
+        # 7. 发送最终统计到Queue
         try:
-            final_file_data = {
+            final_stats = {
                 'agent_id': agent_id,
-                'total_messages_received': test_message_count,
-                'e2e_latency_histogram_encoded': local_stats.e2e_latency_histogram.encode(),
-                'timestamp': time.time(),
-                'epoch': current_epoch,
-                'final': True
+                'type': 'consumer',
+                'final': True,
+                'total_messages': message_count
             }
-            with open(stats_file, 'wb') as f:
-                pickle.dump(final_file_data, f)
-            logger.info(f"Consumer Agent {agent_id} wrote final stats to {stats_file}")
+            stats_queue.put(final_stats, timeout=1.0)
+            logger.info(f"Consumer Agent {agent_id} sent final stats to queue")
         except Exception as e:
-            logger.error(f"Consumer Agent {agent_id} error writing final stats file: {e}")
-
-        # 8. 发送最终统计到Queue - 已注释，仅使用文件输出
-        # try:
-        #     final_stats = {
-        #         'agent_id': agent_id,
-        #         'type': 'consumer',
-        #         'final': True,
-        #         'total_messages': message_count
-        #     }
-        #     stats_queue.put(final_stats, timeout=1.0)
-        # except Exception as e:
-        #     logger.error(f"Consumer Agent {agent_id} error sending final stats: {e}")
+            logger.error(f"Consumer Agent {agent_id} error sending final stats: {e}")
 
         logger.info(f"Consumer Agent {agent_id} terminated")

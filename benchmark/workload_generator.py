@@ -171,7 +171,7 @@ class WorkloadGenerator:
                 )
 
         # 开始启动所有负载，producer开始发消息，consumer开始接收消息
-        self.worker.start_load(producer_work_assignment)
+        self.worker.start_load(producer_work_assignment, self.workload.message_processing_delay_ms)
 
         if self.workload.warmup_duration_minutes > 0:
             logger.info(f"----- Starting warm-up traffic ({self.workload.warmup_duration_minutes}m) ------")
@@ -401,12 +401,9 @@ class WorkloadGenerator:
             if current_backlog <= min_backlog:
                 logger.info(f"--- Completed backlog draining in {timer.elapsed_seconds()} s ---")
 
-                try:
-                    time.sleep(test_duration_minutes * 60)
-                except KeyboardInterrupt:
-                    raise RuntimeError("Interrupted")
-
+                # 立即允许正常的测试时间检查生效
                 self.need_to_wait_for_backlog_draining = False
+                logger.info(f"--- Backlog draining completed, test will continue for remaining duration ---")
                 return
 
             try:

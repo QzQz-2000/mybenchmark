@@ -36,3 +36,8 @@ class Workload:
         self.test_duration_minutes = 0
 
         self.warmup_duration_minutes = 1
+
+        # 消息处理延迟（毫秒），用于模拟慢速消费者
+        # 0 表示无延迟（默认），> 0 表示每条消息处理后等待指定毫秒数
+        # 实际延迟 = 批量消息数 * message_processing_delay_ms
+        self.message_processing_delay_ms = 0

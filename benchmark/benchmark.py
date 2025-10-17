@@ -216,6 +216,7 @@ class Benchmark:
         workload.backlog_drain_ratio = data.get('backlogDrainRatio', 1.0)
         workload.test_duration_minutes = data.get('testDurationMinutes', 0)
         workload.warmup_duration_minutes = data.get('warmupDurationMinutes', 1)
+        workload.message_processing_delay_ms = data.get('messageProcessingDelayMs', 0)
 
         # Handle key distributor
         key_dist = data.get('keyDistributor', 'NO_KEY')
