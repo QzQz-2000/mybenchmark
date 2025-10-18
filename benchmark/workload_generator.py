@@ -442,6 +442,9 @@ class WorkloadGenerator:
         throughput_format = PaddingDecimalFormat("0.0", 4)
         dec = PaddingDecimalFormat("0.0", 4)
 
+        # 用于记录Agent停止时刻（用于准确计算吞吐量）
+        test_actual_end_time = start_time
+
         while True:
             try:
                 time.sleep(10)
@@ -453,6 +456,7 @@ class WorkloadGenerator:
 
             # 如果已经超时，根据参数决定是否停止Agent
             if now >= test_end_time and not self.need_to_wait_for_backlog_draining:
+                test_actual_end_time = now  # 记录Agent停止时刻，用于准确计算吞吐量
                 if stop_agents_when_done:
                     logger.info(f"----- Test duration reached, stopping agents ------")
                     self.run_completed = True
@@ -620,6 +624,50 @@ class WorkloadGenerator:
 
         for percentile_obj in agg.end_to_end_latency.get_percentile_to_value_dict(percentile_list).items():
             result.aggregated_end_to_end_latency_quantiles[percentile_obj[0]] = percentile_obj[1]
+
+        # 计算真正的平均吞吐量：基于总消息数和实际测试时长
+        final_counters = self.worker.get_counters_stats()
+        # 使用Agent停止时刻计算，不包含后续的统计计算时间
+        actual_test_duration = (test_actual_end_time - start_time) / 1e9  # 实际测试时长（秒）
+
+        if actual_test_duration > 0:
+            # 保存总消息数
+            result.aggregated_messages_sent = final_counters.messages_sent
+            result.aggregated_messages_received = final_counters.messages_received
+
+            result.aggregated_publish_rate_avg = final_counters.messages_sent / actual_test_duration
+            result.aggregated_consume_rate_avg = final_counters.messages_received / actual_test_duration
+
+            # 计算以MB/s为单位的吞吐量: (消息数 * 消息大小) / 时长 / 1024 / 1024
+            result.aggregated_publish_throughput_avg = (final_counters.messages_sent * result.message_size) / actual_test_duration / 1024 / 1024
+            result.aggregated_consume_throughput_avg = (final_counters.messages_received * result.message_size) / actual_test_duration / 1024 / 1024
+
+            # 数据完整性检查：consumer不应该收到比producer发送的更多消息
+            if final_counters.messages_received > final_counters.messages_sent:
+                logger.warning(
+                    f"⚠️  Data integrity issue: messages_received ({final_counters.messages_received}) > "
+                    f"messages_sent ({final_counters.messages_sent}). "
+                    f"This may indicate a counter synchronization issue or leftover messages from previous tests."
+                )
+
+            logger.info(
+                f"----- Aggregated Throughput: "
+                f"Publish Rate: {rate_format.format(result.aggregated_publish_rate_avg)} msg/s / "
+                f"{throughput_format.format(result.aggregated_publish_throughput_avg)} MB/s | "
+                f"Consume Rate: {rate_format.format(result.aggregated_consume_rate_avg)} msg/s / "
+                f"{throughput_format.format(result.aggregated_consume_throughput_avg)} MB/s | "
+                f"Total Messages Sent: {final_counters.messages_sent} | "
+                f"Total Messages Received: {final_counters.messages_received} | "
+                f"Message Loss Rate: {dec.format((1 - final_counters.messages_received / final_counters.messages_sent) * 100 if final_counters.messages_sent > 0 else 0)}% | "
+                f"Actual Test Duration: {dec.format(actual_test_duration)} s ------"
+            )
+        else:
+            result.aggregated_messages_sent = 0
+            result.aggregated_messages_received = 0
+            result.aggregated_publish_rate_avg = 0.0
+            result.aggregated_consume_rate_avg = 0.0
+            result.aggregated_publish_throughput_avg = 0.0
+            result.aggregated_consume_throughput_avg = 0.0
 
         return result
 

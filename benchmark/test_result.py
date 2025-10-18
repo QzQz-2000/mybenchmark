@@ -92,6 +92,14 @@ class TestResult:
         self.aggregated_end_to_end_latency_9999pct = 0.0
         self.aggregated_end_to_end_latency_max = 0.0
 
+        # Aggregated throughput metrics (calculated from total messages / total time)
+        self.aggregated_publish_rate_avg = 0.0  # Average producer throughput (msg/s)
+        self.aggregated_consume_rate_avg = 0.0  # Average consumer throughput (msg/s)
+        self.aggregated_publish_throughput_avg = 0.0  # Average producer throughput (MB/s)
+        self.aggregated_consume_throughput_avg = 0.0  # Average consumer throughput (MB/s)
+        self.aggregated_messages_sent = 0  # Total messages sent by producer
+        self.aggregated_messages_received = 0  # Total messages received by consumer
+
     def get_topics(self) -> int:
         return self.topics
 

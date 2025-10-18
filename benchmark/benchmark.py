@@ -299,6 +299,12 @@ class Benchmark:
             'aggregatedEndToEndLatency999pct': result.aggregated_end_to_end_latency_999pct,
             'aggregatedEndToEndLatency9999pct': result.aggregated_end_to_end_latency_9999pct,
             'aggregatedEndToEndLatencyMax': result.aggregated_end_to_end_latency_max,
+            'aggregatedPublishRateAvg': result.aggregated_publish_rate_avg,
+            'aggregatedConsumeRateAvg': result.aggregated_consume_rate_avg,
+            'aggregatedPublishThroughputAvg': result.aggregated_publish_throughput_avg,
+            'aggregatedConsumeThroughputAvg': result.aggregated_consume_throughput_avg,
+            'aggregatedMessagesSent': result.aggregated_messages_sent,
+            'aggregatedMessagesReceived': result.aggregated_messages_received,
         }
 
 

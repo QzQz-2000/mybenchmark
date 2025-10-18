@@ -3,19 +3,19 @@
 name: Slow Consumer High Parallelism Test
 
 topics: 1
-partitionsPerTopic: 100
+partitionsPerTopic: 1
 messageSize: 1024
 
 producersPerTopic: 1
 producerRate: 1000          # 固定速率：100 msg/s per producer (总共 200 msg/s)
 
 subscriptionsPerTopic: 1
-consumerPerSubscription: 70  # 4个消费者并行处理（对比2个）
+consumerPerSubscription: 1  # 4个消费者并行处理（对比2个）
 
 # 慢速消费者配置
 # 每条消息处理延迟 100ms，模拟慢速消费场景
 # 使用4个消费者应该能获得接近2倍的吞吐量提升
-messageProcessingDelayMs: 50
+#messageProcessingDelayMs: 0
 
-testDurationMinutes: 2
-warmupDurationMinutes: 1
+testDurationMinutes: 1
+warmupDurationMinutes: 0
