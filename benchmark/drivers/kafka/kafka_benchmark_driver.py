@@ -320,9 +320,19 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
         except Exception as e:
             logger.error(f"❌ Error deleting topics: {e}")
 
-    def close(self):
-        """Close all resources and cleanup topics."""
+    def delete_all_created_consumer_groups(self):
+        """
+        Consumer groups are no longer deleted as each test run uses unique timestamped group names.
+        This method is kept for backward compatibility but does nothing.
+        """
         import logging
+        logger = logging.getLogger(__name__)
+        logger.info("ℹ️  Consumer groups are not deleted (using timestamped unique names per test run)")
+
+    def close(self):
+        """Close all resources and cleanup topics and consumer groups."""
+        import logging
+        import time
         logger = logging.getLogger(__name__)
 
         # Stop all producers
@@ -341,6 +351,13 @@ class KafkaBenchmarkDriver(BenchmarkDriver):
 
         self.producers.clear()
         self.consumers.clear()
+
+        # Wait a bit for consumers to fully disconnect
+        logger.info("⏳ Waiting 2 seconds for consumers to fully disconnect...")
+        time.sleep(2)
+
+        # Delete consumer groups first (must be done before topics are deleted)
+        self.delete_all_created_consumer_groups()
 
         # Delete created topics for idempotency
         self.delete_all_created_topics()

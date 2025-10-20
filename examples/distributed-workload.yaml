@@ -1,0 +1,25 @@
+# Example workload for distributed testing
+# This workload will be distributed across multiple worker nodes
+
+name: distributed-test-workload
+
+# Topics configuration
+topics: 1
+partitionsPerTopic: 10
+
+# Message configuration
+messageSize: 1024  # 1KB messages
+useRandomizedPayloads: false
+
+# Workload pattern
+subscriptionsPerTopic: 1
+producersPerTopic: 1
+consumerPerSubscription: 10
+
+# Rate and duration
+producerRate: 1000  # messages per second per producer
+testDurationMinutes: 1
+warmupDurationMinutes: 0
+
+# Key distribution
+keyDistributor: NO_KEY

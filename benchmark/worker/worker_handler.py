@@ -59,8 +59,9 @@ class WorkerHandler:
                 self.worker.initialize_driver(temp_path)
                 return jsonify({'status': 'ok'})
             except Exception as e:
-                logger.error(f"Error initializing driver: {e}")
-                return jsonify({'error': str(e)}), 500
+                logger.error(f"Error initializing driver: {e}", exc_info=True)
+                import traceback
+                return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
         @self.app.route('/create-topics', methods=['POST'])
         def create_topics():
@@ -78,6 +79,26 @@ class WorkerHandler:
                 return jsonify(topics)
             except Exception as e:
                 logger.error(f"Error creating topics: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/delete-topics', methods=['POST'])
+        def delete_topics():
+            """Delete topics endpoint."""
+            data = request.json
+            topics = data.get('topics', [])
+
+            try:
+                if hasattr(self.worker, 'benchmark_driver') and self.worker.benchmark_driver:
+                    if hasattr(self.worker.benchmark_driver, 'delete_topics'):
+                        delete_future = self.worker.benchmark_driver.delete_topics(topics)
+                        delete_future.result()  # Wait for completion
+                        return jsonify({'status': 'ok', 'deleted': len(topics)})
+                    else:
+                        return jsonify({'error': 'Driver does not support delete_topics'}), 400
+                else:
+                    return jsonify({'error': 'No benchmark driver initialized'}), 400
+            except Exception as e:
+                logger.error(f"Error deleting topics: {e}", exc_info=True)
                 return jsonify({'error': str(e)}), 500
 
         @self.app.route('/create-producers', methods=['POST'])
@@ -125,17 +146,28 @@ class WorkerHandler:
         def start_load():
             """Start load endpoint."""
             from .commands.producer_work_assignment import ProducerWorkAssignment
+            from benchmark.utils.distributor.key_distributor_type import KeyDistributorType
 
             data = request.json
             assignment = ProducerWorkAssignment()
             assignment.publish_rate = data['publishRate']
-            # TODO: Set keyDistributorType and payloadData
+            message_processing_delay_ms = data.get('messageProcessingDelayMs', 0)
+
+            # Set key distributor type
+            if data.get('keyDistributorType'):
+                assignment.key_distributor_type = KeyDistributorType(data['keyDistributorType'])
+
+            # Set payload data (convert from list back to bytes)
+            if data.get('payloadData'):
+                assignment.payload_data = [bytes(payload) for payload in data['payloadData']]
+            else:
+                assignment.payload_data = []
 
             try:
-                self.worker.start_load(assignment)
+                self.worker.start_load(assignment, message_processing_delay_ms)
                 return jsonify({'status': 'ok'})
             except Exception as e:
-                logger.error(f"Error starting load: {e}")
+                logger.error(f"Error starting load: {e}", exc_info=True)
                 return jsonify({'error': str(e)}), 500
 
         @self.app.route('/adjust-rate', methods=['POST'])
@@ -183,6 +215,26 @@ class WorkerHandler:
                 logger.error(f"Error getting counters stats: {e}")
                 return jsonify({'error': str(e)}), 500
 
+        @self.app.route('/period-stats', methods=['GET'])
+        def get_period_stats():
+            """Get period stats endpoint."""
+            try:
+                stats = self.worker.get_period_stats()
+                return jsonify(stats.to_dict())
+            except Exception as e:
+                logger.error(f"Error getting period stats: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/cumulative-latencies', methods=['GET'])
+        def get_cumulative_latencies():
+            """Get cumulative latencies endpoint."""
+            try:
+                latencies = self.worker.get_cumulative_latencies()
+                return jsonify(latencies.to_dict())
+            except Exception as e:
+                logger.error(f"Error getting cumulative latencies: {e}")
+                return jsonify({'error': str(e)}), 500
+
         @self.app.route('/reset-stats', methods=['POST'])
         def reset_stats():
             """Reset stats endpoint."""
@@ -191,6 +243,32 @@ class WorkerHandler:
                 return jsonify({'status': 'ok'})
             except Exception as e:
                 logger.error(f"Error resetting stats: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/start-producing', methods=['POST'])
+        def start_producing():
+            """Signal producers to start producing."""
+            try:
+                if hasattr(self.worker, 'start_producing_event'):
+                    self.worker.start_producing_event.set()
+                    return jsonify({'status': 'ok'})
+                else:
+                    return jsonify({'error': 'Worker does not support start_producing_event'}), 400
+            except Exception as e:
+                logger.error(f"Error starting production: {e}")
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/stop-producing', methods=['POST'])
+        def stop_producing():
+            """Signal producers to stop producing."""
+            try:
+                if hasattr(self.worker, 'start_producing_event'):
+                    self.worker.start_producing_event.clear()
+                    return jsonify({'status': 'ok'})
+                else:
+                    return jsonify({'error': 'Worker does not support start_producing_event'}), 400
+            except Exception as e:
+                logger.error(f"Error stopping production: {e}")
                 return jsonify({'error': str(e)}), 500
 
         @self.app.route('/stop-all', methods=['POST'])

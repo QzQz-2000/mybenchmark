@@ -63,9 +63,9 @@ class WorkloadGenerator:
                     delete_future.result()  # Wait for deletion command to complete
                     logger.info(f"🗑️  Deletion command completed in {delete_timer.elapsed_millis()} ms")
 
-                    # 等待10秒，确保Kafka异步删除完成
-                    logger.info("⏳ Waiting 10 seconds for completing asynchronous topic deletion...")
-                    time.sleep(10)
+                    # 等待20秒，确保Kafka异步删除完成
+                    logger.info("⏳ Waiting 20 seconds for completing asynchronous topic deletion...")
+                    time.sleep(20)
                     logger.info("✅ Old topic cleanup completed")
 
                 except Exception as e:
@@ -121,6 +121,9 @@ class WorkloadGenerator:
         self._create_consumers(topics)
         self._create_producers(topics)
 
+        # 📊 显示Agent分配统计信息
+        self._log_agent_distribution_stats(topics)
+
         # 发一条消息，确保consumer已经就绪
         self._ensure_topics_are_ready()
 
@@ -164,31 +167,76 @@ class WorkloadGenerator:
                     payload_reader.load(self.workload.payload_file)
                 )
             else:
-                # 全0填充，默认情况
-                # Generate simple payload of the specified size
-                producer_work_assignment.payload_data.append(
-                    bytes(self.workload.message_size)
-                )
+                # 生成模拟真实场景的混合数据（50% 可压缩 + 50% 随机）
+                # 这更接近真实业务数据（如 JSON、Protobuf）的压缩特性
+                import os
+                import random
 
-        # 开始启动所有负载，producer开始发消息，consumer开始接收消息
+                # 50% 是重复的可压缩数据，50% 是随机数据
+                compressible_size = self.workload.message_size // 2
+                random_size = self.workload.message_size - compressible_size
+
+                # 生成类似 JSON 的重复数据
+                json_like_pattern = b'{"id":0000,"name":"user","data":"' + b'x' * (compressible_size - 40) + b'"}'
+                random_part = os.urandom(random_size)
+
+                # 混合在一起
+                realistic_payload = json_like_pattern + random_part
+                producer_work_assignment.payload_data.append(realistic_payload)
+
+        # 开始启动所有负载
+        # start_load() 内部会：
+        # 1. 启动 Producer 和 Consumer Agent 进程
+        # 2. 等待 Consumer Group 稳定（Producer 在此期间暂停）
+        # 3. 发送信号让 Producer 开始发送消息
         self.worker.start_load(producer_work_assignment, self.workload.message_processing_delay_ms)
 
         if self.workload.warmup_duration_minutes > 0:
             logger.info(f"----- Starting warm-up traffic ({self.workload.warmup_duration_minutes}m) ------")
+            # 启动 Producer 进行 warmup
+            logger.info("🚀 Signaling Producer Agents to start producing for warmup...")
+            warmup_start_ns = time.perf_counter_ns()
+            self.worker.start_producing_event.set()
+
             # ✅ Warmup阶段：不停止Agent，不收集结果
-            self._print_and_collect_stats(self.workload.warmup_duration_minutes * 60, stop_agents_when_done=False)
+            self._print_and_collect_stats(
+                self.workload.warmup_duration_minutes * 60,
+                stop_agents_when_done=False,
+                producer_start_time_ns=warmup_start_ns
+            )
+
+            # Warmup 结束后重置统计（不需要暂停 Producer）
+            logger.info("Resetting stats after warmup...")
+            self.worker.reset_stats()
+            logger.info(f"Stats reset after warmup - producers continue running")
 
         # 积压测试
         if self.workload.consumer_backlog_size_gb > 0:
             self.executor.submit(self._build_and_drain_backlog, self.workload.test_duration_minutes)
 
-        # 重置统计，清除预热数据
-        self.worker.reset_stats()
         logger.info(f"----- Starting benchmark traffic ({self.workload.test_duration_minutes}m)------")
+
+        # 🔧 FIX Bug #4 & #6: 记录 Producer 实际开始时间（在 Consumer 稳定后）
+        # 如果没有 warmup，需要启动 Producer；如果有 warmup，Producer 已经在运行
+        if self.workload.warmup_duration_minutes == 0:
+            # ✅ 在正式测试开始时，发送信号让 Producer 开始发送消息
+            logger.info("🚀 Signaling Producer Agents to start producing messages for benchmark...")
+            benchmark_start_ns = time.perf_counter_ns()
+            self.worker.start_producing_event.set()
+            signal_elapsed_ns = time.perf_counter_ns() - benchmark_start_ns
+            logger.info(f"✅ Producer start signal sent (took {signal_elapsed_ns / 1_000_000:.2f}ms)")
+        else:
+            logger.info("✅ Producers already running (warmup completed), starting benchmark collection...")
+            # Warmup 后，Producer 继续运行，从 reset_stats 后开始计时
+            benchmark_start_ns = time.perf_counter_ns()
 
         # 收集结果（内部会停止Agent）
         # ✅ 正式测试阶段：停止Agent，收集结果
-        result = self._print_and_collect_stats(self.workload.test_duration_minutes * 60, stop_agents_when_done=True)
+        result = self._print_and_collect_stats(
+            self.workload.test_duration_minutes * 60,
+            stop_agents_when_done=True,
+            producer_start_time_ns=benchmark_start_ns
+        )
         # 清理和返回（Agent已在_print_and_collect_stats中停止）
         self.run_completed = True
 
@@ -312,18 +360,136 @@ class WorkloadGenerator:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
+    def _log_agent_distribution_stats(self, topics: List[str]):
+        """Log detailed agent distribution statistics."""
+        logger.info("=" * 80)
+        logger.info("📊 AGENT DISTRIBUTION SUMMARY")
+        logger.info("=" * 80)
+
+        # 计算总的 Agent 数量
+        total_producers = len(topics) * self.workload.producers_per_topic
+        total_consumers = len(topics) * self.workload.subscriptions_per_topic * self.workload.consumer_per_subscription
+
+        logger.info(f"📈 Total Configuration:")
+        logger.info(f"  Topics: {len(topics)}")
+        logger.info(f"  Partitions per Topic: {self.workload.partitions_per_topic}")
+        logger.info(f"  Total Partitions: {len(topics) * self.workload.partitions_per_topic}")
+        logger.info("")
+        logger.info(f"👥 Producer Agents:")
+        logger.info(f"  Producers per Topic: {self.workload.producers_per_topic}")
+        logger.info(f"  Total Producer Agents: {total_producers}")
+        logger.info("")
+        logger.info(f"👥 Consumer Agents:")
+        logger.info(f"  Subscriptions per Topic: {self.workload.subscriptions_per_topic}")
+        logger.info(f"  Consumers per Subscription: {self.workload.consumer_per_subscription}")
+        logger.info(f"  Total Consumer Agents: {total_consumers}")
+        logger.info("")
+
+        # 检查是否是分布式模式
+        from .worker.distributed_workers_ensemble import DistributedWorkersEnsemble
+        if isinstance(self.worker, DistributedWorkersEnsemble):
+            num_workers = len(self.worker.workers)
+            logger.info(f"🌐 Distributed Mode: {num_workers} workers")
+            logger.info("")
+
+            # 计算每个 Worker 的 Agent 分配（使用相同的 round-robin 算法）
+            # Producer 分配
+            producers_per_worker = self._simulate_distribution(total_producers, num_workers)
+            logger.info(f"📍 Producer Distribution Across Workers:")
+            for i, count in enumerate(producers_per_worker):
+                worker_id = self.worker.workers[i].id()
+                logger.info(f"  Worker {i+1} ({worker_id}): {count} producer agents")
+            logger.info("")
+
+            # Consumer 分配
+            consumers_per_worker = self._simulate_distribution(total_consumers, num_workers)
+            logger.info(f"📍 Consumer Distribution Across Workers:")
+            for i, count in enumerate(consumers_per_worker):
+                worker_id = self.worker.workers[i].id()
+                logger.info(f"  Worker {i+1} ({worker_id}): {count} consumer agents")
+            logger.info("")
+
+            # 总 Agent 分配
+            logger.info(f"📍 Total Agent Distribution:")
+            for i in range(num_workers):
+                worker_id = self.worker.workers[i].id()
+                total_agents = producers_per_worker[i] + consumers_per_worker[i]
+                logger.info(
+                    f"  Worker {i+1} ({worker_id}): "
+                    f"{total_agents} agents ({producers_per_worker[i]} producers + {consumers_per_worker[i]} consumers)"
+                )
+            logger.info("")
+
+            # Kafka Partition 分配信息
+            logger.info(f"🔄 Kafka Partition Assignment:")
+            logger.info(f"  Total Partitions: {len(topics) * self.workload.partitions_per_topic}")
+            logger.info(f"  Total Consumer Agents: {total_consumers}")
+            if total_consumers > 0:
+                # 所有 consumer 属于同一个 consumer group（相同的 subscription name）
+                consumers_per_subscription = self.workload.consumer_per_subscription
+                if consumers_per_subscription <= self.workload.partitions_per_topic:
+                    partitions_per_consumer = self.workload.partitions_per_topic // consumers_per_subscription
+                    logger.info(
+                        f"  Consumer Group Size: {consumers_per_subscription} consumers per subscription"
+                    )
+                    logger.info(
+                        f"  Expected Partitions per Consumer: ~{partitions_per_consumer} partitions "
+                        f"(Kafka will dynamically assign)"
+                    )
+                else:
+                    logger.info(
+                        f"  ⚠️  Consumer Group Size ({consumers_per_subscription}) > Partitions per Topic "
+                        f"({self.workload.partitions_per_topic}), some consumers will be idle"
+                    )
+            logger.info("")
+
+        else:
+            # 本地模式
+            logger.info(f"💻 Local Mode: Single worker")
+            logger.info(f"  Total Agents: {total_producers + total_consumers} ({total_producers} producers + {total_consumers} consumers)")
+            logger.info("")
+
+        logger.info("=" * 80)
+
+    @staticmethod
+    def _simulate_distribution(total_items: int, num_workers: int) -> List[int]:
+        """
+        模拟 round-robin 分配算法，返回每个 worker 分配到的数量。
+        这与 DistributedWorkersEnsemble._partition_list() 的逻辑一致。
+        """
+        if num_workers <= 0:
+            return []
+
+        result = [0] * num_workers
+
+        if total_items <= num_workers:
+            # 每个 item 分配到独立的 worker
+            for i in range(total_items):
+                result[i] += 1
+        else:
+            # Round-robin 分配
+            for i in range(total_items):
+                result[i % num_workers] += 1
+
+        return result
+
     def _create_consumers(self, topics: List[str]):
         """Create consumers for topics."""
         from benchmark.worker.commands.consumer_assignment import ConsumerAssignment
         from benchmark.worker.commands.topic_subscription import TopicSubscription
         from benchmark.utils.random_generator import RandomGenerator
         from benchmark.utils.timer import Timer
+        from datetime import datetime
 
         consumer_assignment = ConsumerAssignment()
 
+        # 生成时间戳，格式: YYYYMMDD-HHMMSS
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
         for topic in topics:
             for i in range(self.workload.subscriptions_per_topic):
-                subscription_name = f"sub-{i:03d}-{RandomGenerator.get_random_string()}"
+                # 添加时间戳到subscription name，确保每次运行都使用不同的consumer group
+                subscription_name = f"sub-{i:03d}-{timestamp}-{RandomGenerator.get_random_string()}"
                 for j in range(self.workload.consumer_per_subscription):
                     consumer_assignment.topics_subscriptions.append(
                         TopicSubscription(topic, subscription_name)
@@ -411,7 +577,8 @@ class WorkloadGenerator:
             except KeyboardInterrupt:
                 raise RuntimeError("Interrupted")
 
-    def _print_and_collect_stats(self, test_duration_seconds: int, stop_agents_when_done: bool = True) -> TestResult:
+    def _print_and_collect_stats(self, test_duration_seconds: int, stop_agents_when_done: bool = True,
+                                  producer_start_time_ns: int = None) -> TestResult:
         """Print and collect statistics during the test.
 
         Args:
@@ -419,13 +586,20 @@ class WorkloadGenerator:
             stop_agents_when_done: Whether to stop agents when test duration is reached.
                                    Set to False during warmup to keep agents running.
                                    Set to True during actual test to stop agents at the end.
+            producer_start_time_ns: Producer actual start time in nanoseconds (after Consumer stabilization).
+                                    If None, will use current time.
         """
         from benchmark.utils.padding_decimal_format import PaddingDecimalFormat
 
+        # 🔧 FIX Bug #4 & #6: 使用 Producer 实际开始时间作为基准
+        # 这样可以排除 Consumer Rebalance 等待时间，准确计算吞吐量
         start_time = time.perf_counter_ns()
+        if producer_start_time_ns is None:
+            producer_start_time_ns = start_time
+            logger.warning("producer_start_time_ns not provided, using current time as baseline")
 
         # Print report stats
-        old_time = time.perf_counter_ns()
+        old_time = producer_start_time_ns  # 🔧 从 Producer 开始时间计时
 
         test_end_time = start_time + test_duration_seconds * 1_000_000_000 if test_duration_seconds > 0 else float('inf')
 
@@ -468,6 +642,14 @@ class WorkloadGenerator:
 
             stats = self.worker.get_period_stats()
             elapsed = (now - old_time) / 1e9
+
+            # 🔍 DEBUG: 第一次统计时显示详细信息
+            if old_time == start_time:  # 第一个周期
+                logger.info(f"🔍 FIRST PERIOD DEBUG:")
+                logger.info(f"  messages_sent this period: {stats.messages_sent}")
+                logger.info(f"  elapsed time: {elapsed:.3f} seconds")
+                logger.info(f"  calculated publish_rate: {stats.messages_sent / elapsed:.2f} msg/s")
+                logger.info(f"  expected (1000 msg/s × {elapsed:.1f}s): {1000 * elapsed:.0f} messages")
 
             publish_rate = stats.messages_sent / elapsed
             publish_throughput = stats.bytes_sent / elapsed / 1024 / 1024
@@ -627,8 +809,9 @@ class WorkloadGenerator:
 
         # 计算真正的平均吞吐量：基于总消息数和实际测试时长
         final_counters = self.worker.get_counters_stats()
-        # 使用Agent停止时刻计算，不包含后续的统计计算时间
-        actual_test_duration = (test_actual_end_time - start_time) / 1e9  # 实际测试时长（秒）
+        # 🔧 FIX Bug #4: 使用 Producer 实际开始时间计算，排除 Consumer Rebalance 等待时间
+        # 使用 Agent 停止时刻计算，不包含后续的统计计算时间
+        actual_test_duration = (test_actual_end_time - producer_start_time_ns) / 1e9  # 实际测试时长（秒）
 
         if actual_test_duration > 0:
             # 保存总消息数

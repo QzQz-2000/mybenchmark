@@ -21,7 +21,8 @@ import random
 
 
 def isolated_agent_worker(agent_id, topic, kafka_producer_config, kafka_consumer_config,
-                         work_assignment, stop_event, stats_queue, shared_rate, reset_flag, ready_queue):
+                         work_assignment, stop_event, stats_queue, shared_rate, reset_flag, ready_queue,
+                         start_producing_event=None):
     """
     独立Agent进程工作函数 - ISOLATED模式
     模拟一个完全独立的数字孪生实体
@@ -106,6 +107,12 @@ def isolated_agent_worker(agent_id, topic, kafka_producer_config, kafka_consumer
         except Exception as e:
             logger.error(f"Agent {agent_id} failed to send ready signal: {e}")
 
+        # ✅ 等待开始生产信号（让 Consumer Group 先稳定）
+        if start_producing_event:
+            logger.info(f"Agent {agent_id} waiting for start_producing signal...")
+            start_producing_event.wait()  # 阻塞直到主进程设置此事件
+            logger.info(f"Agent {agent_id} received start signal, beginning to produce messages")
+
         # 5. 统计汇报时间和epoch跟踪
         last_rate_check = time.time()
         last_stats_report = time.time()
@@ -117,6 +124,13 @@ def isolated_agent_worker(agent_id, topic, kafka_producer_config, kafka_consumer
 
         while not stop_event.is_set():
             try:
+                # ✅ 检查是否应该暂停（用于 backlog 模式，不用于 warmup）
+                if start_producing_event and not start_producing_event.is_set():
+                    # Producer 被暂停，等待重新开始信号
+                    producer.poll(0)  # 继续处理 callbacks
+                    time.sleep(0.01)  # 短暂sleep避免CPU空转
+                    continue
+
                 loop_iter_start = time.perf_counter() if message_count < 50 else None
 
                 # 6.1 检查速率调整和epoch重置（每100ms检查一次）
@@ -134,15 +148,40 @@ def isolated_agent_worker(agent_id, topic, kafka_producer_config, kafka_consumer
                     if reset_flag:
                         new_epoch = reset_flag.value
                         if new_epoch > current_epoch:
-                            logger.info(f"Agent {agent_id} detected stats reset: epoch {current_epoch} -> {new_epoch}, resetting local stats and rate limiter")
+                            logger.info(f"Agent {agent_id} detected stats reset: epoch {current_epoch} -> {new_epoch}, resetting local stats")
+
+                            # 🔧 FIX Bug #3: 先发送旧 epoch 的最终统计，再切换到新 epoch
+                            # 这样可以避免最后一批 histogram 数据丢失
+                            try:
+                                final_old_epoch_stats = {
+                                    'agent_id': agent_id,
+                                    'type': 'producer',
+                                    'messages_sent': local_stats.messages_sent,
+                                    'bytes_sent': local_stats.bytes_sent,
+                                    'errors': local_stats.errors,
+                                    'timestamp': now,
+                                    'epoch': current_epoch,
+                                    'final_epoch': True,  # 标记为 epoch 的最后一批数据
+                                    'pub_latency_histogram_encoded': local_stats.pub_latency_histogram.encode(),
+                                    'pub_delay_histogram_encoded': local_stats.pub_delay_histogram.encode(),
+                                }
+                                stats_queue.put(final_old_epoch_stats, timeout=1.0)
+                                logger.info(f"Agent {agent_id} sent final stats for epoch {current_epoch}")
+                            except Exception as e:
+                                logger.warning(f"Agent {agent_id} failed to send final epoch {current_epoch} stats: {e}")
+
+                            # 切换到新 epoch
                             current_epoch = new_epoch
-                            # 重置本地统计
+
+                            # 重置本地统计（histogram 在 epoch 切换时需要重置）
                             local_stats.messages_sent = 0
                             local_stats.bytes_sent = 0
                             local_stats.errors = 0
-                            local_stats.reset_histograms()
+                            local_stats.reset_histograms()  # Epoch 切换时重置 histogram 是合理的
+
                             # 不重新创建RateLimiter，保持速率连续性（与Java版本一致）
-                            # Java版本中RateLimiter不会在reset_stats时重新创建
+                            # 立即发送新epoch统计，无需等待下一个报告周期
+                            last_stats_report = now - 1.0  # 强制下次循环立即发送
 
                     last_rate_check = now
 
@@ -225,7 +264,7 @@ def isolated_agent_worker(agent_id, topic, kafka_producer_config, kafka_consumer
                 # 6.6 定期汇报统计（每秒一次）
                 if now - last_stats_report >= 1.0:
                     try:
-                        # 发送histogram编码数据（与Java版本一致）
+                        # 🔧 FIX Bug #1: 只在成功发送后才重置 histogram，避免数据丢失
                         # 编码后的histogram非常紧凑（通常几KB）
                         stats_dict = {
                             'agent_id': agent_id,
@@ -245,23 +284,28 @@ def isolated_agent_worker(agent_id, topic, kafka_producer_config, kafka_consumer
                             stats_queue.put(stats_dict, timeout=0.1)
                             queue_put_success = True
                         except:
-                            # 队列满，记录警告并丢弃本次统计
-                            logger.warning(f"Agent {agent_id} stats queue full, dropping stats (sent={local_stats.messages_sent})")
+                            # 队列满，记录警告但保留 histogram 数据到下次发送
+                            logger.warning(f"Agent {agent_id} stats queue full, preserving histogram for next period (sent={local_stats.messages_sent})")
 
-                        # 重置周期统计（无论是否发送成功都要清空）
+                        # ✅ 计数器总是重置（避免重复计数）
+                        # 计数器是增量数据，不能累加；histogram 是累积数据，可以保留
                         local_stats.messages_sent = 0
                         local_stats.bytes_sent = 0
                         local_stats.errors = 0
-                        # 重置histogram（创建新实例）
-                        local_stats.reset_histograms()
 
-                        if not queue_put_success:
-                            logger.warning(f"Agent {agent_id} cleared histograms after queue full")
+                        # 🔧 FIX Bug #2: Histogram 改为累积语义（不重置），与 Consumer 保持一致
+                        # Histogram 永远不重置，累积整个测试期间的所有样本
+                        # 如果队列满导致发送失败，histogram 保留，下次会重新发送完整的累积数据
+                        # 主进程会在每次 get_period_stats() 时合并所有 Agent 的 histogram
+                        # 然后使用 Recorder 的双缓冲机制获取增量数据
 
                     except Exception as e:
                         logger.error(f"Agent {agent_id} failed to send stats: {e}", exc_info=True)
-                        # 发生异常时也要重置histogram
-                        local_stats.reset_histograms()
+                        # ✅ 异常时也要重置计数器（避免重复计数）
+                        # Histogram 保留，下次会重新发送完整数据
+                        local_stats.messages_sent = 0
+                        local_stats.bytes_sent = 0
+                        local_stats.errors = 0
 
                     last_stats_report = now
 

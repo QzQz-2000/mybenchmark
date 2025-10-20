@@ -71,14 +71,27 @@ class LocalWorker(Worker):
         # ISOLATED模式核心组件
         self.agent_processes = []  # Agent进程列表
         self.stop_agents = multiprocessing.Event()  # Agent停止信号
+        self.start_producing_event = multiprocessing.Event()  # Producer开始发送信号（等待Consumer稳定）
         self.pause_consumers_event = multiprocessing.Event()  # Consumer暂停信号（用于backlog模式）
-        # 队列容量设置（考虑macOS系统限制：信号量上限32767）
-        # 设置为32000以保持跨平台兼容性
-        # 容量计算：100个Agent * 每秒1次 * 320秒缓冲 = 32000
-        self.stats_queue = multiprocessing.Queue(maxsize=32000)  # 跨进程统计队列
+
+        # 🔧 FIX Bug #5: 增大队列容量以减少数据丢失
+        # 队列容量设置（考虑系统限制）
+        # - macOS: 信号量上限 32767
+        # - Linux: 通常更大（可以到几百万）
+        # 策略：使用系统允许的最大值，并添加监控
+        import platform
+        if platform.system() == 'Darwin':  # macOS
+            max_queue_size = 32000  # 保守值，避免达到系统限制
+        else:  # Linux 和其他系统
+            max_queue_size = 100000  # 更大的容量，支持更多 Agent
+
+        logger.info(f"Stats queue max size: {max_queue_size} (platform: {platform.system()})")
+
+        self.stats_queue = multiprocessing.Queue(maxsize=max_queue_size)  # 跨进程统计队列
+        self.stats_queue_max_size = max_queue_size  # 保存最大容量用于监控
         self.shared_publish_rate = multiprocessing.Value('d', 1.0)  # 共享速率（支持动态调整）
         self.reset_stats_flag = multiprocessing.Value('i', 0)  # 重置统计标志（epoch计数器）
-        self.agent_ready_queue = multiprocessing.Queue(maxsize=32000)  # Agent就绪/错误信号队列
+        self.agent_ready_queue = multiprocessing.Queue(maxsize=max_queue_size)  # Agent就绪/错误信号队列
 
         # 统计收集线程
         self.stats_collector_thread = None
@@ -90,8 +103,77 @@ class LocalWorker(Worker):
         """Initialize the benchmark driver."""
         import yaml
 
+        # 允许重新初始化（分布式模式下可能会多次调用）
         if self.benchmark_driver is not None:
-            raise RuntimeError("Driver already initialized")
+            logger.warning("Driver already initialized, closing previous driver and reinitializing")
+            try:
+                self.benchmark_driver.close()
+            except Exception as e:
+                logger.warning(f"Error closing previous driver: {e}")
+            self.benchmark_driver = None
+
+            # 🔧 FIX: 清理所有状态，避免多次测试时的数据残留
+            logger.info("Cleaning up previous test state...")
+
+            # 1. 清空 producer/consumer 元数据
+            self.producers = []
+            self.consumer_metadata = []
+
+            # 2. 清空统计队列中的残留数据
+            drained = 0
+            try:
+                while not self.stats_queue.empty():
+                    self.stats_queue.get_nowait()
+                    drained += 1
+            except:
+                pass
+            if drained > 0:
+                logger.info(f"Drained {drained} stale stats from queue")
+
+            # 3. 清空 ready 队列
+            drained_ready = 0
+            try:
+                while not self.agent_ready_queue.empty():
+                    self.agent_ready_queue.get_nowait()
+                    drained_ready += 1
+            except:
+                pass
+            if drained_ready > 0:
+                logger.info(f"Drained {drained_ready} stale ready signals from queue")
+
+            # 4. 重置统计对象
+            self.stats.reset()
+
+            # 5. 递增 epoch 计数器（而不是重置为0）
+            # 这样可以确保第二次测试的 epoch > 第一次测试，统计收集线程可以丢弃旧数据
+            old_epoch = self.reset_stats_flag.value
+            new_epoch = old_epoch + 1
+            self.reset_stats_flag.value = new_epoch
+            logger.info(f"Incrementing epoch: {old_epoch} -> {new_epoch}")
+
+            # 6. 重置所有 Event 状态
+            self.stop_agents.clear()
+            self.start_producing_event.clear()
+            self.pause_consumers_event.clear()
+            self.test_completed.clear()
+
+            # 7. 重置共享速率
+            self.shared_publish_rate.value = 1.0
+
+            # 8. 清空 agent 进程列表（应该已经被 stop_all 清理了）
+            self.agent_processes = []
+
+            # 9. 停止旧的统计收集线程（如果还在运行）
+            if self.stats_collector_running:
+                logger.warning("Stats collector was still running, stopping it...")
+                self.stats_collector_running = False
+                if self.stats_collector_thread and self.stats_collector_thread.is_alive():
+                    self.stats_collector_thread.join(timeout=2.0)
+                    if self.stats_collector_thread.is_alive():
+                        logger.error("Stats collector thread did not stop!")
+                logger.info("Stats collector stopped during cleanup")
+
+            logger.info("Previous test state cleaned")
 
         self.test_completed.clear()
 
@@ -159,6 +241,7 @@ class LocalWorker(Worker):
         ]
 
         logger.info(f"Registered {len(self.producers)} producer metadata (Agents will create actual producers)")
+        logger.info(f"📋 Producer topics assigned to this worker: {topics}")
 
     def create_consumers(self, consumer_assignment: ConsumerAssignment):
         """
@@ -181,23 +264,8 @@ class LocalWorker(Worker):
         ]
 
         logger.info(f"Registered {len(self.consumer_metadata)} consumer metadata (V2: Agents will create actual consumers)")
-
-        # V1兼容性: 如果需要V1模式（所有Consumer在主进程），取消注释下面代码
-        # class ConsumerInfo:
-        #     def __init__(self, id, topic, subscription, callback):
-        #         self.id = id
-        #         self.topic = topic
-        #         self.subscription_name = subscription
-        #         self.consumer_callback = callback
-        #
-        # consumer_infos = [
-        #     ConsumerInfo(i, ts.topic, ts.subscription, self)
-        #     for i, ts in enumerate(consumer_assignment.topics_subscriptions)
-        # ]
-        #
-        # consumers_future = self.benchmark_driver.create_consumers(consumer_infos)
-        # self.consumers = consumers_future.result()
-        # logger.info(f"Created {len(self.consumers)} consumers (V1 mode)")
+        consumer_topics = [ts.topic for ts in consumer_assignment.topics_subscriptions]
+        logger.info(f"📋 Consumer topics assigned to this worker: {consumer_topics}")
 
     def probe_producers(self):
         """
@@ -333,7 +401,8 @@ class LocalWorker(Worker):
                         self.stats_queue,               # stats queue
                         self.shared_publish_rate,       # shared rate (for dynamic adjustment)
                         self.reset_stats_flag,          # reset stats flag
-                        self.agent_ready_queue          # ready/error queue
+                        self.agent_ready_queue,         # ready/error queue
+                        self.start_producing_event      # start producing event (wait for consumers)
                     ),
                     name=f"kafka-producer-agent-{i}",
                     daemon=False  # 非daemon，确保正常关闭
@@ -348,13 +417,15 @@ class LocalWorker(Worker):
         # ✅ 优化：延迟启动，减少 Consumer Group Rebalance 风暴
         consumer_start_delay_ms = 150  # 每个 consumer 启动间隔 150ms
 
+        # Agent ID 必须连续且唯一：Producer用0到num_producer_agents-1，Consumer从num_producer_agents开始
         for i, consumer_meta in enumerate(self.consumer_metadata):
+            agent_id = num_producer_agents + i  # Consumer agent ID 从 producer 数量后开始
             if is_pulsar:
                 # Pulsar consumer agent arguments
                 process = multiprocessing.Process(
                     target=consumer_worker_func,
                     args=(
-                        i,                              # agent_id
+                        agent_id,                       # agent_id (unique across all agents)
                         consumer_meta.topic,            # topic
                         consumer_meta.subscription,     # subscription name
                         pulsar_client_config,           # Pulsar client config
@@ -364,7 +435,7 @@ class LocalWorker(Worker):
                         self.reset_stats_flag,          # reset stats flag
                         self.agent_ready_queue          # ready/error queue
                     ),
-                    name=f"pulsar-consumer-agent-{i}",
+                    name=f"pulsar-consumer-agent-{agent_id}",
                     daemon=False
                 )
             else:
@@ -372,7 +443,7 @@ class LocalWorker(Worker):
                 process = multiprocessing.Process(
                     target=consumer_worker_func,
                     args=(
-                        i,                              # agent_id
+                        agent_id,                       # agent_id (unique across all agents)
                         consumer_meta.topic,            # topic
                         consumer_meta.subscription,     # subscription name
                         kafka_consumer_config,          # Kafka consumer config
@@ -383,7 +454,7 @@ class LocalWorker(Worker):
                         self.pause_consumers_event,     # pause event (for backlog mode)
                         message_processing_delay_ms     # message processing delay (for slow consumer simulation)
                     ),
-                    name=f"kafka-consumer-agent-{i}",
+                    name=f"kafka-consumer-agent-{agent_id}",
                     daemon=False
                 )
 
@@ -445,9 +516,12 @@ class LocalWorker(Worker):
             logger.info(f"=" * 80)
             logger.info(f"⏳ Waiting {stabilization_time:.1f}s for Consumer Group rebalance to stabilize...")
             logger.info(f"   This ensures all consumers have settled on their partition assignments")
+            logger.info(f"   Producer Agents are paused, waiting for start signal")
             logger.info(f"=" * 80)
             time.sleep(stabilization_time)
-            logger.info("✅ Consumer Group should now be stable, ready for workload")
+            logger.info("✅ Consumer Group should now be stable")
+
+        logger.info("✅ All Agents ready, waiting for workload start signal...")
 
     def _cleanup_old_stats_files(self):
         """清理旧的统计文件（每次测试开始时调用）"""
@@ -493,8 +567,31 @@ class LocalWorker(Worker):
 
             logger.info("Stats collector thread started")
 
+            # 🔧 FIX Bug #5: 添加队列监控
+            queue_full_warnings = 0
+            last_queue_size_log = time.time()
+
             while self.stats_collector_running:
                 try:
+                    # 🔧 FIX Bug #5: 定期监控队列大小（每10秒）
+                    # 注意：macOS 不支持 qsize()，所以使用 try-except 跳过监控
+                    now = time.time()
+                    if now - last_queue_size_log > 10.0:
+                        try:
+                            queue_size = self.stats_queue.qsize()
+                            utilization = (queue_size / self.stats_queue_max_size) * 100 if self.stats_queue_max_size > 0 else 0
+
+                            if utilization > 80:
+                                logger.warning(f"⚠️  Stats queue high utilization: {queue_size}/{self.stats_queue_max_size} ({utilization:.1f}%)")
+                                queue_full_warnings += 1
+                            elif utilization > 50:
+                                logger.info(f"Stats queue size: {queue_size}/{self.stats_queue_max_size} ({utilization:.1f}%)")
+                        except NotImplementedError:
+                            # macOS 不支持 qsize()，跳过队列监控
+                            pass
+
+                        last_queue_size_log = now
+
                     # 非阻塞获取统计数据（timeout=0.5秒）
                     try:
                         stats_dict = self.stats_queue.get(timeout=0.5)
@@ -707,10 +804,12 @@ class LocalWorker(Worker):
         if self.agent_processes:
             num_agents = len(self.agent_processes)
             agents_entered_new_epoch = set()
-            max_wait_time = 2.0  # 最多等待2秒（Agent每秒发送统计）
+            # 动态调整等待时间：基本2秒 + 每个Agent 0.2秒（允许慢速consumer响应）
+            # 例如：31个Agent → 2 + 31*0.2 = 8.2秒
+            max_wait_time = max(10.0, 2.0 + num_agents * 1)
             start_wait = time.time()
 
-            logger.info(f"Waiting for {num_agents} agents to enter new epoch {new_epoch}...")
+            logger.info(f"Waiting for {num_agents} agents to enter new epoch {new_epoch} (timeout: {max_wait_time:.1f}s)...")
 
             while len(agents_entered_new_epoch) < num_agents:
                 if time.time() - start_wait > max_wait_time:
@@ -737,7 +836,13 @@ class LocalWorker(Worker):
             if len(agents_entered_new_epoch) == num_agents:
                 logger.info(f"All {num_agents} agents entered new epoch {new_epoch}")
             else:
-                logger.warning(f"Only {len(agents_entered_new_epoch)}/{num_agents} agents confirmed new epoch")
+                # 找出哪些 agent 没有确认
+                all_agent_ids = set(range(num_agents))
+                missing_agents = all_agent_ids - agents_entered_new_epoch
+                logger.warning(
+                    f"Only {len(agents_entered_new_epoch)}/{num_agents} agents confirmed new epoch. "
+                    f"Missing agents: {sorted(missing_agents)}"
+                )
 
         # 3. 清空queue中剩余的旧epoch数据（只清理旧epoch，保留新epoch数据）
         drained_old = 0

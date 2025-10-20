@@ -194,26 +194,50 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                         if message_count <= 105:  # 前几批显示日志
                             logger.debug(f"Consumer Agent {agent_id} applied processing delay: {delay_seconds:.3f}s for {len(messages)} messages")
 
-                # 5.2 检查epoch重置（每秒检查一次）
+                # 5.2 检查epoch重置（每 0.2秒检查一次，提高响应速度）
                 now = time.time()
-                if now - last_epoch_check > 1.0:
+                if now - last_epoch_check > 0.2:
                     if reset_flag:
                         new_epoch = reset_flag.value
                         if new_epoch > current_epoch:
                             logger.info(f"Consumer Agent {agent_id} detected stats reset: epoch {current_epoch} -> {new_epoch}")
+
+                            # 🔧 FIX Bug #3: 先发送旧 epoch 的最终统计，再切换到新 epoch
+                            try:
+                                final_old_epoch_stats = {
+                                    'agent_id': agent_id,
+                                    'type': 'consumer',
+                                    'messages_received': local_stats.messages_received,
+                                    'bytes_received': local_stats.bytes_received,
+                                    'timestamp': now,
+                                    'epoch': current_epoch,
+                                    'final_epoch': True,  # 标记为 epoch 的最后一批数据
+                                    'e2e_latency_histogram_encoded': local_stats.e2e_latency_histogram.encode(),
+                                }
+                                stats_queue.put(final_old_epoch_stats, timeout=1.0)
+                                logger.info(f"Consumer Agent {agent_id} sent final stats for epoch {current_epoch}")
+                            except Exception as e:
+                                logger.warning(f"Consumer Agent {agent_id} failed to send final epoch {current_epoch} stats: {e}")
+
+                            # 切换到新 epoch
                             current_epoch = new_epoch
+
                             # 重置本地统计
                             local_stats.messages_received = 0
                             local_stats.bytes_received = 0
-                            local_stats.reset_histogram()
+                            local_stats.reset_histogram()  # Epoch 切换时重置 histogram
+
+                            # 立即发送新epoch统计，无需等待下一个报告周期
+                            last_stats_report = now - 1.0  # 强制下次循环立即发送
 
                     last_epoch_check = now
 
                 # 5.3 定期汇报统计（每秒一次）
                 if now - last_stats_report >= 1.0:
                     try:
+                        # 🔧 FIX Bug #1: 只在成功发送后才重置计数器，避免数据丢失
                         # 发送histogram编码数据（与Java版本一致）
-                        # 注意：只发送周期计数器，histogram不重置（累积统计）
+                        # 注意：histogram 不重置（累积统计），计数器每次重置
                         stats_dict = {
                             'agent_id': agent_id,
                             'type': 'consumer',
@@ -226,19 +250,23 @@ def isolated_consumer_agent(agent_id, topic, subscription_name, kafka_consumer_c
                         }
 
                         # 使用带超时的put，避免队列满时阻塞
+                        queue_put_success = False
                         try:
                             stats_queue.put(stats_dict, timeout=0.1)
-                            # 只重置周期计数器，不重置histogram（histogram是累积的）
-                            local_stats.messages_received = 0
-                            local_stats.bytes_received = 0
+                            queue_put_success = True
                         except:
-                            logger.warning(f"Consumer Agent {agent_id} stats queue full, dropping stats report")
-                            # 即使队列满，也重置计数器避免重复计数
-                            local_stats.messages_received = 0
-                            local_stats.bytes_received = 0
+                            logger.warning(f"Consumer Agent {agent_id} stats queue full, histogram preserved but counters will be lost")
+
+                        # ✅ 计数器总是重置（避免重复计数）
+                        # 计数器是增量数据，不能累加；histogram 是累积数据，可以保留
+                        local_stats.messages_received = 0
+                        local_stats.bytes_received = 0
 
                     except Exception as e:
                         logger.error(f"Consumer Agent {agent_id} failed to send stats: {e}", exc_info=True)
+                        # ✅ 异常时也要重置计数器（避免重复计数）
+                        local_stats.messages_received = 0
+                        local_stats.bytes_received = 0
 
                     last_stats_report = now
 

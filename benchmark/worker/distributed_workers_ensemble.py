@@ -30,6 +30,67 @@ class DistributedWorkersEnsemble(Worker):
         # 只需要 len(workers) 个线程，每个worker一个线程即可
         self.executor = ThreadPoolExecutor(max_workers=max(1, len(workers)), thread_name_prefix="distributed-worker")
 
+        # V2架构标志：consumer_metadata表示使用独立Consumer进程
+        # 在分布式模式下，每个远程Worker都使用V2架构，所以设置此标志跳过probe阶段
+        self.consumer_metadata = []  # 标记为V2架构，跳过probe phase
+
+        # V2架构使用的事件（在分布式模式下通过HTTP API传播到远程Workers）
+        # 使用自定义类来包装HTTP调用
+        class DistributedEvent:
+            """分布式事件，通过HTTP API传播到所有Workers"""
+            def __init__(self, ensemble):
+                self._ensemble = ensemble
+
+            def set(self):
+                """设置事件 - 通知所有Workers开始生产"""
+                futures = []
+                for worker in self._ensemble.workers:
+                    if hasattr(worker, 'start_producing'):
+                        future = self._ensemble.executor.submit(worker.start_producing)
+                        futures.append(future)
+                # 等待所有Workers确认
+                for future in futures:
+                    future.result()
+
+            def clear(self):
+                """清除事件 - 通知所有Workers停止生产"""
+                futures = []
+                for worker in self._ensemble.workers:
+                    if hasattr(worker, 'stop_producing'):
+                        future = self._ensemble.executor.submit(worker.stop_producing)
+                        futures.append(future)
+                # 等待所有Workers确认
+                for future in futures:
+                    future.result()
+
+        self.start_producing_event = DistributedEvent(self)
+
+        # 添加 benchmark_driver 属性（用于兼容 workload_generator 的 topic 删除逻辑）
+        # 实际上是第一个 worker 的 driver（因为 topic 操作只需要在一个 worker 上执行）
+        class DistributedDriver:
+            """分布式 Driver 包装器，将操作委托给第一个 Worker"""
+            def __init__(self, ensemble):
+                self._ensemble = ensemble
+
+            def delete_topics(self, topics: List[str]):
+                """删除 topics - 只在第一个 worker 上执行"""
+                if self._ensemble.workers:
+                    self._ensemble.workers[0].delete_topics(topics)
+                    # 返回一个 Future 对象以兼容原有接口
+                    from concurrent.futures import Future
+                    future = Future()
+                    future.set_result(None)
+                    return future
+                else:
+                    raise RuntimeError("No workers available")
+
+            def get_topic_name_prefix(self):
+                """获取 topic 名称前缀 - 从第一个 worker 获取"""
+                # 默认返回标准前缀，因为所有 workers 应该使用相同的前缀
+                return "test-topic"
+
+        self.benchmark_driver = DistributedDriver(self)
+
     def _execute_on_all_workers(self, func_name: str, *args, **kwargs):
         """
         Execute a function on all workers in parallel.
@@ -70,6 +131,11 @@ class DistributedWorkersEnsemble(Worker):
         # Partition topics across workers
         topics_per_worker = self._partition_list(topics, len(self.workers))
 
+        logger.info(f"📊 Distributing {len(topics)} producer topics across {len(self.workers)} workers:")
+        for i, worker_topics in enumerate(topics_per_worker):
+            if worker_topics:
+                logger.info(f"  Worker {i+1} ({self.workers[i].id()}): {len(worker_topics)} topics → {worker_topics}")
+
         futures = []
         for i, worker in enumerate(self.workers):
             worker_topics = topics_per_worker[i]
@@ -86,6 +152,15 @@ class DistributedWorkersEnsemble(Worker):
         # Partition subscriptions across workers
         subscriptions = consumer_assignment.topics_subscriptions
         subs_per_worker = self._partition_list(subscriptions, len(self.workers))
+
+        # 更新consumer_metadata以标记V2架构（用于跳过probe phase）
+        self.consumer_metadata = subscriptions
+
+        logger.info(f"📊 Distributing {len(subscriptions)} consumer subscriptions across {len(self.workers)} workers:")
+        for i, worker_subs in enumerate(subs_per_worker):
+            if worker_subs:
+                worker_topics = [ts.topic for ts in worker_subs]
+                logger.info(f"  Worker {i+1} ({self.workers[i].id()}): {len(worker_subs)} subscriptions → {worker_topics}")
 
         futures = []
         for i, worker in enumerate(self.workers):
@@ -104,9 +179,9 @@ class DistributedWorkersEnsemble(Worker):
         """Probe producers on all workers."""
         self._execute_on_all_workers('probe_producers')
 
-    def start_load(self, producer_work_assignment: ProducerWorkAssignment):
+    def start_load(self, producer_work_assignment: ProducerWorkAssignment, message_processing_delay_ms: int = 0):
         """Start load on all workers."""
-        self._execute_on_all_workers('start_load', producer_work_assignment)
+        self._execute_on_all_workers('start_load', producer_work_assignment, message_processing_delay_ms)
 
     def adjust_publish_rate(self, publish_rate: float):
         """Adjust publish rate on all workers."""

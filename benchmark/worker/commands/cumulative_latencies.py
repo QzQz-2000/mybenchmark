@@ -11,6 +11,7 @@
 # limitations under the License.
 
 from hdrh.histogram import HdrHistogram
+import base64
 
 
 class CumulativeLatencies:
@@ -35,3 +36,26 @@ class CumulativeLatencies:
         result.end_to_end_latency.add(to_add.end_to_end_latency)
 
         return result
+
+    def to_dict(self) -> dict:
+        """Convert CumulativeLatencies to dictionary for JSON serialization."""
+        return {
+            'publishLatency': base64.b64encode(self.publish_latency.encode()).decode('ascii'),
+            'publishDelayLatency': base64.b64encode(self.publish_delay_latency.encode()).decode('ascii'),
+            'endToEndLatency': base64.b64encode(self.end_to_end_latency.encode()).decode('ascii')
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'CumulativeLatencies':
+        """Create CumulativeLatencies from dictionary (JSON deserialization)."""
+        latencies = cls()
+
+        # Decode histograms from base64
+        if 'publishLatency' in data and data['publishLatency']:
+            latencies.publish_latency = HdrHistogram.decode(base64.b64decode(data['publishLatency']))
+        if 'publishDelayLatency' in data and data['publishDelayLatency']:
+            latencies.publish_delay_latency = HdrHistogram.decode(base64.b64decode(data['publishDelayLatency']))
+        if 'endToEndLatency' in data and data['endToEndLatency']:
+            latencies.end_to_end_latency = HdrHistogram.decode(base64.b64decode(data['endToEndLatency']))
+
+        return latencies

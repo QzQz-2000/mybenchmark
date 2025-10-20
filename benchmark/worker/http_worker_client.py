@@ -58,6 +58,12 @@ class HttpWorkerClient(Worker):
         response.raise_for_status()
         return response.json()
 
+    def delete_topics(self, topics: List[str]):
+        """Delete topics on remote worker."""
+        data = {'topics': topics}
+        response = self.session.post(f"{self.worker_address}/delete-topics", json=data, timeout=self.default_timeout)
+        response.raise_for_status()
+
     def create_producers(self, topics: List[str]):
         """Create producers on remote worker."""
         response = self.session.post(f"{self.worker_address}/create-producers", json=topics, timeout=self.default_timeout)
@@ -79,12 +85,13 @@ class HttpWorkerClient(Worker):
         response = self.session.post(f"{self.worker_address}/probe-producers", timeout=self.default_timeout)
         response.raise_for_status()
 
-    def start_load(self, producer_work_assignment: ProducerWorkAssignment):
+    def start_load(self, producer_work_assignment: ProducerWorkAssignment, message_processing_delay_ms: int = 0):
         """Start load on remote worker."""
         data = {
             'publishRate': producer_work_assignment.publish_rate,
             'keyDistributorType': producer_work_assignment.key_distributor_type.value if producer_work_assignment.key_distributor_type else None,
-            'payloadData': [list(payload) for payload in producer_work_assignment.payload_data] if producer_work_assignment.payload_data else []
+            'payloadData': [list(payload) for payload in producer_work_assignment.payload_data] if producer_work_assignment.payload_data else [],
+            'messageProcessingDelayMs': message_processing_delay_ms
         }
         response = self.session.post(f"{self.worker_address}/start-load", json=data, timeout=self.default_timeout)
         response.raise_for_status()
@@ -120,15 +127,15 @@ class HttpWorkerClient(Worker):
         """Get period stats from remote worker."""
         response = self.session.get(f"{self.worker_address}/period-stats", timeout=self.default_timeout)
         response.raise_for_status()
-        # TODO: Deserialize PeriodStats with histograms
-        return response.json()
+        data = response.json()
+        return PeriodStats.from_dict(data)
 
     def get_cumulative_latencies(self) -> CumulativeLatencies:
         """Get cumulative latencies from remote worker."""
         response = self.session.get(f"{self.worker_address}/cumulative-latencies", timeout=self.default_timeout)
         response.raise_for_status()
-        # TODO: Deserialize CumulativeLatencies with histograms
-        return response.json()
+        data = response.json()
+        return CumulativeLatencies.from_dict(data)
 
     def reset_stats(self):
         """Reset stats on remote worker."""
@@ -142,6 +149,24 @@ class HttpWorkerClient(Worker):
             response.raise_for_status()
         except Exception as e:
             logger.warning(f"Error stopping remote worker: {e}")
+
+    def start_producing(self):
+        """Signal remote worker to start producing."""
+        try:
+            response = self.session.post(f"{self.worker_address}/start-producing", timeout=self.default_timeout)
+            response.raise_for_status()
+        except Exception as e:
+            logger.error(f"Error starting production on remote worker: {e}")
+            raise
+
+    def stop_producing(self):
+        """Signal remote worker to stop producing."""
+        try:
+            response = self.session.post(f"{self.worker_address}/stop-producing", timeout=self.default_timeout)
+            response.raise_for_status()
+        except Exception as e:
+            logger.error(f"Error stopping production on remote worker: {e}")
+            raise
 
     def id(self) -> str:
         """Get worker ID."""

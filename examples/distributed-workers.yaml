@@ -1,0 +1,10 @@
+# Distributed Workers Configuration
+# List the URLs of all worker nodes for distributed testing
+
+workers:
+  - http://localhost:8080
+  - http://localhost:8081
+  # Add more workers as needed:
+  # - http://worker1.example.com:8080
+  # - http://worker2.example.com:8080
+  # - http://worker3.example.com:8080

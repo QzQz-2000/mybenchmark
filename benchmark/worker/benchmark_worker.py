@@ -2,7 +2,7 @@ import argparse
 import logging
 import json
 from flask import Flask
-# from .worker_handler import WorkerHandler
+from .worker_handler import WorkerHandler
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ class BenchmarkWorker:
         self.http_port = http_port
         self.stats_port = stats_port
         self.app = None
+        self.worker_handler = None
 
     def start(self):
         """Start the benchmark worker HTTP server."""
@@ -29,8 +30,8 @@ class BenchmarkWorker:
         self.app = Flask(__name__)
 
         # Initialize worker handler
-        # TODO: Implement Prometheus metrics provider
-        # worker_handler = WorkerHandler(self.app, stats_logger)
+        # TODO: Implement Prometheus metrics provider for stats_logger
+        self.worker_handler = WorkerHandler(self.app, stats_logger=None)
 
         # Start Flask server
         self.app.run(host='0.0.0.0', port=self.http_port, threaded=True)

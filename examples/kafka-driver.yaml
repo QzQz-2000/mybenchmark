@@ -6,8 +6,7 @@ replicationFactor: 1
 
 # Kafka common configuration
 commonConfig: |
-  bootstrap.servers=localhost:9092,localhost:9093,localhost:9094
-
+  bootstrap.servers=localhost:9092
 # Producer-specific configuration (confluent-kafka uses librdkafka parameters)
 producerConfig: |
   acks=1
@@ -20,7 +19,7 @@ producerConfig: |
   queue.buffering.max.kbytes=1048576
   # ✅ 增加队列中的消息数量限制
   queue.buffering.max.messages=1000000
-  compression.type=lz4
+  # compression.type=lz4
 
 # Consumer-specific configuration
 consumerConfig: |
