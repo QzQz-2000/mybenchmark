@@ -1,0 +1,5 @@
+pyyaml>=5.1
+confluent-kafka>=2.0.0
+hdrhistogram>=0.10.3
+requests>=2.25.0
+Flask>=2.0.0
