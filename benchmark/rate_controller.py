@@ -27,6 +27,9 @@ class RateController:
         self.max_ramping_factor = float(os.getenv('MAX_RAMPING_FACTOR', '1'))
         self.ramping_factor = self.max_ramping_factor
 
+        # 最小速率保护：防止速率降为 0
+        self.min_rate = float(os.getenv('MIN_PUBLISH_RATE', '100'))
+
         self.previous_total_published = 0
         self.previous_total_received = 0
 
@@ -65,7 +68,10 @@ class RateController:
         next_expected = max(0, expected - backlog)
         next_expected_rate = self._rate(next_expected, period_nanos)
         actual_rate = self._rate(actual, period_nanos)
-        return min(actual_rate, next_expected_rate)
+        calculated_rate = min(actual_rate, next_expected_rate)
+
+        # 确保速率不会降到最小值以下
+        return max(self.min_rate, calculated_rate)
 
     def _rate(self, count: int, period_nanos: int) -> float:
         return (count / float(period_nanos)) * self.ONE_SECOND_IN_NANOS

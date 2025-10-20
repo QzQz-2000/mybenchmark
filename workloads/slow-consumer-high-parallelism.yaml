@@ -5,7 +5,7 @@ partitionsPerTopic: 1
 messageSize: 1024
 
 producersPerTopic: 1
-producerRate: 1000          
+producerRate: 10000      
 subscriptionsPerTopic: 1
 consumerPerSubscription: 1
 # # Backlog 配置

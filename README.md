@@ -111,7 +111,7 @@ python -m benchmark.benchmark \
       -d examples/kafka-driver.yaml \
       workloads/1-topic-1-partition-1kb.yaml
 
-python -m benchmark -d examples/kafka-driver.yaml workloads/slow-consumer-high-parallelism.yaml
+python -m benchmark -d examples/kafka-driver-max-throughput.yaml workloads/slow-consumer-high-parallelism.yaml
 
 
 ================================================================================
