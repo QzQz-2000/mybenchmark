@@ -891,15 +891,27 @@ class LocalWorker(Worker):
             logger.info(f"Stopping {len(self.agent_processes)} Agent processes...")
             self.stop_agents.set()
 
-            # 等待进程正常退出（给足够时间flush数据，最多10秒）
+            # 并发等待所有进程同时退出（给足够时间flush数据，最多10秒）
+            # 使用相同的timeout确保所有进程几乎同时停止，最小化计数器差异
+            timeout = 10.0
             start_time = time.time()
-            all_stopped = True
 
+            # 并发等待所有进程
             for process in self.agent_processes:
-                remaining_time = max(0.1, 10 - (time.time() - start_time))
-                process.join(timeout=remaining_time)
+                process.join(timeout=0.01)  # 先快速检查一次，不阻塞
+
+            # 统一等待剩余时间
+            elapsed = time.time() - start_time
+            remaining = max(0, timeout - elapsed)
+            if remaining > 0:
+                time.sleep(remaining)
+
+            # 检查哪些进程还活着
+            all_stopped = True
+            for process in self.agent_processes:
                 if process.is_alive():
                     all_stopped = False
+                    break
 
             if all_stopped:
                 logger.info("All Agent processes exited gracefully")

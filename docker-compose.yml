@@ -43,6 +43,9 @@ services:
       KAFKA_LOG_RETENTION_HOURS: 1
       KAFKA_LOG_SEGMENT_BYTES: 1073741824
       KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      # ⭐ 支持大消息（Broker 级别配置）- 支持 128MB
+      KAFKA_MESSAGE_MAX_BYTES: 134217728
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 134217728
 
 #   # Kafka JMX Exporter (Exposes Kafka JMX metrics in Prometheus format)
 #   kafka-jmx-exporter:

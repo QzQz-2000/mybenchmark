@@ -1,4 +1,4 @@
-name: Kafka Max Throughput
+name: Kafka-Throughput
 driverClass: benchmark.drivers.kafka.kafka_benchmark_driver.KafkaBenchmarkDriver
 
 # Replication factor for Kafka topics
@@ -13,9 +13,9 @@ producerConfig: |
   # 基础配置
   acks=1
 
-  # 批处理优化 - 增大批次以提高吞吐量
-  linger.ms=100
-  batch.size=2097152
+  # 批处理优化 - 减小等待时间，让消息更快发出
+  linger.ms=10
+  batch.size=104857
 
   # 超时配置 - 给予足够时间
   request.timeout.ms=300000
@@ -25,11 +25,11 @@ producerConfig: |
   max.in.flight.requests.per.connection=20
 
   # ⭐ 关键：内存缓冲区配置（避免 Queue Full）
-  # 设置为 2GB 缓冲区
-  queue.buffering.max.kbytes=2097152
+  # 减少缓冲区大小，确保消息能及时发送（不在队列中积压）
+  queue.buffering.max.kbytes=1048576
 
-  # 队列中最大消息数 - 设置为 500 万条
-  queue.buffering.max.messages=5000000
+  # 队列中最大消息数 - 减少到 100万条，避免停止时积压太多
+  queue.buffering.max.messages=1000000
 
   # 压缩 - 根据需要启用（会降低吞吐但节省带宽）
   # compression.type=lz4
@@ -42,8 +42,11 @@ producerConfig: |
   retries=2147483647
   retry.backoff.ms=100
 
-  # 内部队列配置
-  queue.buffering.max.ms=10
+  # 内部队列配置 - 减少批处理等待时间，让消息更快发出
+  queue.buffering.max.ms=5
+
+  # ⭐ 支持大消息：设置为 128MB（librdkafka 参数）
+  message.max.bytes=134217728
 
 # Consumer configuration
 consumerConfig: |
@@ -55,8 +58,8 @@ consumerConfig: |
   # 性能优化参数
   fetch.min.bytes=102400
   fetch.wait.max.ms=500
-  fetch.message.max.bytes=10485760
-  receive.message.max.bytes=100000000
+  fetch.message.max.bytes=134217728
+  receive.message.max.bytes=134217728
   queued.min.messages=100000
 
   # Socket 缓冲区
@@ -65,3 +68,5 @@ consumerConfig: |
 # Topic configuration
 topicConfig: |
   min.insync.replicas=1
+  # ⭐ 支持大消息：Topic 级别允许 128MB 消息
+  max.message.bytes=134217728

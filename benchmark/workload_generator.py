@@ -634,10 +634,18 @@ class WorkloadGenerator:
                 if stop_agents_when_done:
                     logger.info(f"----- Test duration reached, stopping agents ------")
                     self.run_completed = True
-                    self.worker.stop_all()  # 立即停止Agent进程
+
+                    # 🔧 重要：在停止前先获取计数器快照
+                    # 这样统计的是测试时间内真正完成的消息，不包括 flush 期间的消息
+                    logger.info(f"Capturing final counters snapshot before stopping agents...")
+                    final_counters_snapshot = self.worker.get_counters_stats()
+                    logger.info(f"Snapshot: sent={final_counters_snapshot.messages_sent}, received={final_counters_snapshot.messages_received}")
+
+                    self.worker.stop_all()  # 停止Agent进程（会调用 flush）
                     # 现在可以慢慢计算最终统计了（Agent已停止）
                 else:
                     logger.info(f"----- Warm-up duration reached ------")
+                    final_counters_snapshot = None
                 break
 
             stats = self.worker.get_period_stats()
@@ -808,7 +816,15 @@ class WorkloadGenerator:
             result.aggregated_end_to_end_latency_quantiles[percentile_obj[0]] = percentile_obj[1]
 
         # 计算真正的平均吞吐量：基于总消息数和实际测试时长
-        final_counters = self.worker.get_counters_stats()
+        # 🔧 重要：使用停止前的快照，而不是停止后的计数器
+        # 这样统计的是测试时间内真正完成的消息，不包括 flush 期间的消息
+        if 'final_counters_snapshot' in locals() and final_counters_snapshot is not None:
+            final_counters = final_counters_snapshot
+            logger.info(f"Using pre-stop snapshot for final statistics")
+        else:
+            final_counters = self.worker.get_counters_stats()
+            logger.info(f"Using post-stop counters for final statistics (warmup mode or no snapshot)")
+
         # 🔧 FIX Bug #4: 使用 Producer 实际开始时间计算，排除 Consumer Rebalance 等待时间
         # 使用 Agent 停止时刻计算，不包含后续的统计计算时间
         actual_test_duration = (test_actual_end_time - producer_start_time_ns) / 1e9  # 实际测试时长（秒）

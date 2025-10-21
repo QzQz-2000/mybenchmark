@@ -2,10 +2,10 @@ name: Slow Consumer High Parallelism Test
 
 topics: 1
 partitionsPerTopic: 1
-messageSize: 1024
+messageSize: 15360
 
 producersPerTopic: 1
-producerRate: 10000      
+producerRate: 500      
 subscriptionsPerTopic: 1
 consumerPerSubscription: 1
 # # Backlog 配置
@@ -17,5 +17,5 @@ consumerPerSubscription: 1
 # 使用4个消费者应该能获得接近2倍的吞吐量提升
 # messageProcessingDelayMs: 0
 
-testDurationMinutes: 10
+testDurationMinutes: 2
 warmupDurationMinutes: 0
