@@ -1,0 +1,241 @@
+{
+  "workload": "Message PC Test - 1p-1c - Run 1",
+  "driver": "Kafka-Throughput",
+  "messageSize": 1024,
+  "topics": 1,
+  "partitions": 16,
+  "producersPerTopic": 1,
+  "consumersPerTopic": 1,
+  "publishRate": [
+    2649.9443540577413,
+    2938.2030173140747,
+    3130.8271602427326,
+    2927.1845367742044,
+    3071.225480983326
+  ],
+  "publishErrorRate": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "consumeRate": [
+    179.94868666027594,
+    197.51297508161298,
+    199.72104875240703,
+    199.46063417084284,
+    199.29434353092543
+  ],
+  "backlog": [
+    24707,
+    52459,
+    81811,
+    109162,
+    137983
+  ],
+  "publishLatency50pct": [
+    64,
+    134,
+    158,
+    137,
+    116
+  ],
+  "publishLatency75pct": [
+    125,
+    245,
+    290,
+    266,
+    234
+  ],
+  "publishLatency95pct": [
+    291,
+    510,
+    645,
+    616,
+    542
+  ],
+  "publishLatency99pct": [
+    363,
+    861,
+    927,
+    924,
+    896
+  ],
+  "publishLatency999pct": [
+    422,
+    1141,
+    1149,
+    1149,
+    1143
+  ],
+  "publishLatency9999pct": [
+    452,
+    1143,
+    1514,
+    1514,
+    1513
+  ],
+  "publishLatencyMax": [
+    454,
+    1143,
+    1517,
+    1517,
+    1517
+  ],
+  "publishDelayLatency50pct": [
+    0,
+    0,
+    1,
+    1,
+    1
+  ],
+  "publishDelayLatency75pct": [
+    7,
+    6,
+    7,
+    6,
+    6
+  ],
+  "publishDelayLatency95pct": [
+    30,
+    29,
+    31,
+    30,
+    30
+  ],
+  "publishDelayLatency99pct": [
+    39,
+    41,
+    46,
+    45,
+    44
+  ],
+  "publishDelayLatency999pct": [
+    48,
+    110,
+    103,
+    93,
+    88
+  ],
+  "publishDelayLatency9999pct": [
+    52,
+    123,
+    122,
+    121,
+    120
+  ],
+  "publishDelayLatencyMax": [
+    52,
+    124,
+    124,
+    124,
+    124
+  ],
+  "aggregatedPublishLatencyAvg": 178.02097074440334,
+  "aggregatedPublishLatency50pct": 121,
+  "aggregatedPublishLatency75pct": 243,
+  "aggregatedPublishLatency95pct": 546,
+  "aggregatedPublishLatency99pct": 902,
+  "aggregatedPublishLatency999pct": 1143,
+  "aggregatedPublishLatency9999pct": 1512,
+  "aggregatedPublishLatencyMax": 1517,
+  "aggregatedPublishDelayLatencyAvg": 5.749718871545401,
+  "aggregatedPublishDelayLatency50pct": 0,
+  "aggregatedPublishDelayLatency75pct": 6,
+  "aggregatedPublishDelayLatency95pct": 30,
+  "aggregatedPublishDelayLatency99pct": 44,
+  "aggregatedPublishDelayLatency999pct": 92,
+  "aggregatedPublishDelayLatency9999pct": 121,
+  "aggregatedPublishDelayLatencyMax": 124,
+  "aggregatedPublishLatencyQuantiles": {
+    "50": 121,
+    "75": 243,
+    "90": 403,
+    "95": 546,
+    "99": 902,
+    "99.9": 1143,
+    "99.99": 1512
+  },
+  "aggregatedPublishDelayLatencyQuantiles": {
+    "50": 0,
+    "75": 6,
+    "90": 20,
+    "95": 30,
+    "99": 44,
+    "99.9": 92,
+    "99.99": 121
+  },
+  "endToEndLatency50pct": [
+    2478,
+    6711,
+    11405,
+    16101,
+    20787
+  ],
+  "endToEndLatency75pct": [
+    4350,
+    9985,
+    17061,
+    24054,
+    31129
+  ],
+  "endToEndLatency95pct": [
+    6719,
+    14692,
+    23128,
+    31570,
+    40048
+  ],
+  "endToEndLatency99pct": [
+    8072,
+    16569,
+    25489,
+    34407,
+    43801
+  ],
+  "endToEndLatency999pct": [
+    8152,
+    17503,
+    26911,
+    36292,
+    45674
+  ],
+  "endToEndLatency9999pct": [
+    8154,
+    17559,
+    26926,
+    36320,
+    45698
+  ],
+  "endToEndLatencyMax": [
+    8154,
+    17560,
+    26932,
+    36321,
+    45698
+  ],
+  "aggregatedEndToEndLatencyQuantiles": {
+    "50": 16565,
+    "75": 28263,
+    "90": 38692,
+    "95": 43833,
+    "99": 50902,
+    "99.9": 54957,
+    "99.99": 56071
+  },
+  "aggregatedEndToEndLatencyAvg": 18838.1395136612,
+  "aggregatedEndToEndLatency50pct": 16565,
+  "aggregatedEndToEndLatency75pct": 28263,
+  "aggregatedEndToEndLatency95pct": 43833,
+  "aggregatedEndToEndLatency99pct": 50902,
+  "aggregatedEndToEndLatency999pct": 54957,
+  "aggregatedEndToEndLatency9999pct": 56071,
+  "aggregatedEndToEndLatencyMax": 56083,
+  "aggregatedPublishRateAvg": 2957.739587713114,
+  "aggregatedConsumeRateAvg": 195.946075529089,
+  "aggregatedPublishThroughputAvg": 2.888417566126088,
+  "aggregatedConsumeThroughputAvg": 0.19135358938387598,
+  "aggregatedMessagesSent": 178117,
+  "aggregatedMessagesReceived": 11800
+}

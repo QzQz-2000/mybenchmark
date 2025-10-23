@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # Kafka cluster
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+      - "7071:7071"  # JMX Exporter HTTP port
+    volumes:
+      - ./monitoring/kafka-jmx-config.yml:/etc/jmx-exporter/config.yml:ro
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JMX_PORT: 9101
+      KAFKA_JMX_HOSTNAME: kafka
+      # JMX Exporter as Java agent
+      KAFKA_OPTS: "-javaagent:/usr/share/java/cp-base-new/jmx_prometheus_javaagent-0.20.0.jar=7071:/etc/jmx-exporter/config.yml"
+      KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=kafka -Dcom.sun.management.jmxremote.rmi.port=9101"
+      # Performance tuning
+      KAFKA_NUM_NETWORK_THREADS: 8
+      KAFKA_NUM_IO_THREADS: 16
+      KAFKA_SOCKET_SEND_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_RECEIVE_BUFFER_BYTES: 102400
+      KAFKA_SOCKET_REQUEST_MAX_BYTES: 104857600
+      KAFKA_LOG_RETENTION_HOURS: 1
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
+      # ⭐ 支持大消息（Broker 级别配置）- 支持 128MB
+      KAFKA_MESSAGE_MAX_BYTES: 134217728
+      KAFKA_REPLICA_FETCH_MAX_BYTES: 134217728
+    command:
+      - bash
+      - -c
+      - |
+        # Download JMX Exporter if not present
+        if [ ! -f /usr/share/java/cp-base-new/jmx_prometheus_javaagent-0.20.0.jar ]; then
+          echo "Downloading JMX Prometheus Exporter..."
+          wget -P /usr/share/java/cp-base-new/ https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.20.0/jmx_prometheus_javaagent-0.20.0.jar
+        fi
+        # Start Kafka
+        /etc/confluent/docker/run
+
+  # Prometheus (Metrics collection and storage)
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    hostname: prometheus
+    container_name: prometheus-kafka
+    depends_on:
+      - kafka
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus-kafka-alternative.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-kafka-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+
+  # Grafana (Visualization dashboard)
+  grafana:
+    image: grafana/grafana:10.2.0
+    hostname: grafana
+    container_name: grafana-kafka
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    volumes:
+      - grafana-kafka-data:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  prometheus-kafka-data:
+  grafana-kafka-data:

@@ -1,0 +1,22 @@
+# Prometheus configuration for Kafka monitoring (alternative without separate JMX exporter)
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'kafka-benchmark'
+    monitor: 'kafka-monitor'
+
+# Scrape configurations
+scrape_configs:
+  # Kafka JMX metrics via embedded JMX Exporter
+  - job_name: 'kafka-jmx'
+    static_configs:
+      - targets: ['kafka:7071']
+        labels:
+          service: 'kafka'
+          instance: 'kafka-broker-1'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

@@ -1,0 +1,98 @@
+# Kafka JMX Exporter Configuration (Simplified)
+# This configuration exposes Kafka JMX metrics in Prometheus format
+# Connection details are handled by environment variables (JMX_HOST and JMX_PORT)
+
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+whitelistObjectNames:
+  - kafka.server:*
+  - java.lang:*
+  - kafka.network:*
+  - kafka.log:*
+
+# Rules for metrics collection
+rules:
+  # JVM Memory metrics
+  - pattern: 'java.lang<type=Memory><HeapMemoryUsage>(\w+)'
+    name: jvm_memory_heap_$1
+    type: GAUGE
+
+  - pattern: 'java.lang<type=Memory><NonHeapMemoryUsage>(\w+)'
+    name: jvm_memory_nonheap_$1
+    type: GAUGE
+
+  - pattern: 'java.lang<type=MemoryPool, name=(.+)><Usage>(\w+)'
+    name: jvm_memory_pool_bytes_$2
+    labels:
+      pool: "$1"
+    type: GAUGE
+
+  # JVM GC metrics
+  - pattern: 'java.lang<type=GarbageCollector, name=(.+)><CollectionCount>'
+    name: jvm_gc_collection_count
+    labels:
+      gc: "$1"
+    type: COUNTER
+
+  - pattern: 'java.lang<type=GarbageCollector, name=(.+)><CollectionTime>'
+    name: jvm_gc_collection_seconds_sum
+    labels:
+      gc: "$1"
+    type: COUNTER
+    valueFactor: 0.001  # Convert milliseconds to seconds
+
+  # JVM Thread metrics
+  - pattern: 'java.lang<type=Threading><(\w+)ThreadCount>'
+    name: jvm_threads_$1
+    type: GAUGE
+
+  # Process CPU metrics
+  - pattern: 'java.lang<type=OperatingSystem><ProcessCpuLoad>'
+    name: process_cpu_seconds_total
+    type: GAUGE
+
+  - pattern: 'java.lang<type=OperatingSystem><SystemCpuLoad>'
+    name: system_cpu_seconds_total
+    type: GAUGE
+
+  # Kafka Broker metrics
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(.+)><>Count'
+    name: kafka_broker_topic_$1_total
+    type: COUNTER
+
+  - pattern: 'kafka.server<type=BrokerTopicMetrics, name=(.+), topic=(.+)><>Count'
+    name: kafka_broker_topic_$1_total
+    labels:
+      topic: "$2"
+    type: COUNTER
+
+  # Kafka Request metrics
+  - pattern: 'kafka.network<type=RequestMetrics, name=(\w+), request=(\w+)><>Count'
+    name: kafka_network_request_$1_total
+    labels:
+      request: "$2"
+    type: COUNTER
+
+  - pattern: 'kafka.network<type=RequestMetrics, name=(\w+), request=(\w+)><>(\d+)thPercentile'
+    name: kafka_network_request_$1_percentile
+    labels:
+      request: "$2"
+      percentile: "$3"
+    type: GAUGE
+
+  # Kafka Log metrics
+  - pattern: 'kafka.log<type=LogFlushStats, name=LogFlushRateAndTimeMs><>Count'
+    name: kafka_log_flush_total
+    type: COUNTER
+
+  - pattern: 'kafka.log<type=Log, name=(.+), topic=(.+), partition=(.+)><>Value'
+    name: kafka_log_$1
+    labels:
+      topic: "$2"
+      partition: "$3"
+    type: GAUGE
+
+  # Default catch-all for other Kafka metrics
+  - pattern: 'kafka.(\w+)<type=(.+), name=(.+)><>Value'
+    name: kafka_$1_$2_$3
+    type: GAUGE

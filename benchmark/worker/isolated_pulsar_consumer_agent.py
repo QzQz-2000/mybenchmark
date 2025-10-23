@@ -20,7 +20,8 @@ import time
 
 
 def isolated_pulsar_consumer_agent(agent_id, topic, subscription_name, pulsar_client_config, pulsar_consumer_config,
-                                   stop_event, stats_queue, reset_flag, ready_queue):
+                                   stop_event, stats_queue, reset_flag, ready_queue, pause_event=None,
+                                   message_processing_delay_ms=0):
     """
     独立Consumer Agent进程工作函数 - ISOLATED模式 (Pulsar版本)
 
@@ -33,6 +34,8 @@ def isolated_pulsar_consumer_agent(agent_id, topic, subscription_name, pulsar_cl
     :param stats_queue: multiprocessing.Queue - 统计数据队列
     :param reset_flag: multiprocessing.Value - 重置标志（epoch计数器）
     :param ready_queue: multiprocessing.Queue - 就绪/错误信号队列
+    :param pause_event: multiprocessing.Event - 暂停信号（用于backlog模式，可选）
+    :param message_processing_delay_ms: 消息处理延迟（毫秒），用于模拟慢速消费者
     """
     # 设置进程级日志
     logger = logging.getLogger(f"pulsar-consumer-agent-{agent_id}")
@@ -86,6 +89,11 @@ def isolated_pulsar_consumer_agent(agent_id, topic, subscription_name, pulsar_cl
         local_stats = LocalStats()
         message_count = [0]  # Use list to allow modification in nested function
 
+        # 日志输出：消息处理延迟配置
+        if message_processing_delay_ms > 0:
+            logger.info(f"Pulsar Consumer Agent {agent_id} configured with message processing delay: {message_processing_delay_ms} ms per message")
+            logger.info(f"  → This simulates slow consumer (each message will have {message_processing_delay_ms}ms processing delay)")
+
         # 4. 定义 MessageListener 回调函数（与 Java 版本一致）
         def message_listener(consumer, msg):
             """Message listener callback - 异步接收消息（与Java版本一致）"""
@@ -116,6 +124,12 @@ def isolated_pulsar_consumer_agent(agent_id, topic, subscription_name, pulsar_cl
                     if message_count[0] <= 5:
                         logger.warning(f"Pulsar Consumer Agent {agent_id} msg {message_count[0]}: Payload too small")
 
+                # 模拟慢速消费者：处理延迟
+                if message_processing_delay_ms > 0:
+                    time.sleep(message_processing_delay_ms / 1000.0)
+                    if message_count[0] <= 5:
+                        logger.debug(f"Pulsar Consumer Agent {agent_id} applied processing delay: {message_processing_delay_ms}ms for message {message_count[0]}")
+
                 # Acknowledge消息（异步）
                 consumer.acknowledge(msg)
 
@@ -143,11 +157,26 @@ def isolated_pulsar_consumer_agent(agent_id, topic, subscription_name, pulsar_cl
         last_stats_report = time.time()
         last_epoch_check = time.time()
         current_epoch = reset_flag.value if reset_flag else 0
+        is_paused = False  # 跟踪当前暂停状态
 
         # 7. Consumer主循环（MessageListener模式：不需要主动receive）
         # MessageListener会在后台线程异步接收消息，主循环只需要汇报统计和检查停止信号
         while not stop_event.is_set():
             try:
+                # 7.0 检查是否需要暂停/恢复（用于backlog模式）
+                if pause_event:
+                    should_pause = pause_event.is_set()
+                    if should_pause and not is_paused:
+                        # 需要暂停且当前未暂停 -> 执行暂停
+                        consumer.pause_message_listener()
+                        is_paused = True
+                        logger.info(f"🛑 Pulsar Consumer Agent {agent_id} paused (backlog building mode)")
+                    elif not should_pause and is_paused:
+                        # 不需要暂停但当前已暂停 -> 执行恢复
+                        consumer.resume_message_listener()
+                        is_paused = False
+                        logger.info(f"▶️  Pulsar Consumer Agent {agent_id} resumed (backlog draining mode)")
+
                 # 7.1 等待一小段时间（MessageListener在后台接收消息）
                 time.sleep(0.1)
 

@@ -433,7 +433,9 @@ class LocalWorker(Worker):
                         self.stop_agents,               # stop event
                         self.stats_queue,               # stats queue
                         self.reset_stats_flag,          # reset stats flag
-                        self.agent_ready_queue          # ready/error queue
+                        self.agent_ready_queue,         # ready/error queue
+                        self.pause_consumers_event,     # pause event (for backlog mode)
+                        message_processing_delay_ms     # message processing delay (for slow consumer simulation)
                     ),
                     name=f"pulsar-consumer-agent-{agent_id}",
                     daemon=False

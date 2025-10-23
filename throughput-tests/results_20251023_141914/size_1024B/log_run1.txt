@@ -1,0 +1,579 @@
+2025-10-23 14:19:15,654 - benchmark.benchmark - INFO - Starting benchmark with config: {
+  "results_dir": null,
+  "drivers": [
+    "/Users/lbw1125/Desktop/openmessaging-benchmark/examples/kafka-driver.yaml"
+  ],
+  "workers": null,
+  "workers_file": null,
+  "extra_consumers": false,
+  "workloads": [
+    "/Users/lbw1125/Desktop/openmessaging-benchmark/workloads/msg-size-tests/msg_size_1024B_run1.yaml"
+  ],
+  "output": "/Users/lbw1125/Desktop/openmessaging-benchmark/throughput-tests/results_20251023_141914/size_1024B/result_run1.json"
+}
+2025-10-23 14:19:15,687 - benchmark.benchmark - INFO - Workloads: {
+  "msg_size_1024B_run1": {
+    "name": "Message Size Test - 1024B - Run 1",
+    "topics": 1,
+    "partitions_per_topic": 1,
+    "key_distributor": "NO_KEY",
+    "message_size": 1024,
+    "use_randomized_payloads": false,
+    "random_bytes_ratio": 0.0,
+    "randomized_payload_pool_size": 0,
+    "payload_file": null,
+    "subscriptions_per_topic": 1,
+    "producers_per_topic": 1,
+    "consumer_per_subscription": 1,
+    "producer_rate": 10000,
+    "consumer_backlog_size_gb": 0,
+    "backlog_drain_ratio": 1.0,
+    "test_duration_minutes": 1,
+    "warmup_duration_minutes": 0,
+    "message_processing_delay_ms": 0
+  }
+}
+2025-10-23 14:19:16,908 - benchmark.benchmark - INFO - Using LocalWorker (multi-process ISOLATED architecture)
+2025-10-23 14:19:17,021 - benchmark.worker.local_worker - INFO - Stats queue max size: 32000 (platform: Darwin)
+2025-10-23 14:19:17,045 - benchmark.worker.local_worker - INFO - LocalWorker initialized (multi-process ISOLATED architecture)
+2025-10-23 14:19:17,216 - benchmark.benchmark - INFO - --------------- WORKLOAD : Message Size Test - 1024B - Run 1 --- DRIVER : Kafka-Throughput---------------
+2025-10-23 14:19:17,223 - benchmark.worker.local_worker - INFO - Driver config: {'name': 'Kafka-Throughput', 'driverClass': 'benchmark.drivers.kafka.kafka_benchmark_driver.KafkaBenchmarkDriver', 'replicationFactor': 1, 'commonConfig': 'bootstrap.servers=localhost:9092\n', 'producerConfig': '# --- 基础可靠性 ---\nacks=1\nlinger.ms=10\nbatch.size=65536                     # 64KB 批处理（原 104857 太大时会挤压内存）\nmax.in.flight.requests.per.connection=5  # 控制并发请求，防止乱序和积压\nrequest.timeout.ms=300000\ndelivery.timeout.ms=1200000\n\n# --- ⭐ 核心防止 queue full 配置 ---\n# 增大缓冲区容量，让本地缓存更大\nqueue.buffering.max.kbytes=262144     # 256MB（原 1GB 太大，反而占内存）\nqueue.buffering.max.messages=2000000  # 最多200万条消息\nqueue.buffering.max.ms=50             # 允许缓冲50ms再flush\n\n# --- ⭐ 大消息支持 ---\nmessage.max.bytes=134217728           # 128MB\n# --- 压缩（如需省带宽可打开）---\n# compression.type=lz4\n\n# --- 网络缓冲区 ---\nsocket.send.buffer.bytes=524288\nsocket.receive.buffer.bytes=524288\n\n# --- 重试策略 ---\nretries=5\nretry.backoff.ms=500\n', 'consumerConfig': 'auto.offset.reset=earliest\nenable.auto.commit=false\nsession.timeout.ms=300000\nmax.poll.interval.ms=300000\n\nfetch.min.bytes=102400\nfetch.wait.max.ms=500\nfetch.message.max.bytes=134217728\nreceive.message.max.bytes=134217728\nqueued.min.messages=100000\n\nsocket.receive.buffer.bytes=524288\n', 'topicConfig': 'min.insync.replicas=1\nmax.message.bytes=134217728\n'}
+2025-10-23 14:19:17,426 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:17,426 - benchmark.workload_generator - INFO - 🧹 STEP 1: Cleaning up old topics for idempotent test
+2025-10-23 14:19:17,428 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:17,428 - benchmark.workload_generator - INFO - 🗑️  Attempting to delete 1 old topics: ['test-topic-0']
+2025-10-23 14:19:17,429 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Starting deletion of 1 topics: ['test-topic-0']
+2025-10-23 14:19:17,526 - benchmark.drivers.kafka.kafka_benchmark_driver - WARNING - ⚠️  Error deleting topic test-topic-0: KafkaError{code=UNKNOWN_TOPIC_OR_PART,val=3,str="Broker: Unknown topic or partition"}
+2025-10-23 14:19:17,526 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Deletion complete: 0/1 topics deleted
+2025-10-23 14:19:17,527 - benchmark.workload_generator - INFO - 🗑️  Deletion command completed in 97.265948 ms
+2025-10-23 14:19:17,527 - benchmark.workload_generator - INFO - ⏳ Waiting 20 seconds for completing asynchronous topic deletion...
+2025-10-23 14:19:37,542 - benchmark.workload_generator - INFO - ✅ Old topic cleanup completed
+2025-10-23 14:19:37,543 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:37,543 - benchmark.workload_generator - INFO - 📝 STEP 2: Creating new topics
+2025-10-23 14:19:37,543 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:37,543 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 📝 Starting creation of 1 topics: ['test-topic-0']
+2025-10-23 14:19:37,543 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 📝 Topic config properties: {'min.insync.replicas': 1, 'max.message.bytes': 134217728}
+2025-10-23 14:19:37,756 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - ✅ Created topic: test-topic-0 (partitions=1, replication=1)
+2025-10-23 14:19:37,756 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 📝 Topic creation complete: 1 created, 0 already existed
+2025-10-23 14:19:37,756 - benchmark.workload_generator - INFO - ✅ Topic creation command completed in 213.677648 ms
+2025-10-23 14:19:37,756 - benchmark.workload_generator - INFO - ⏳ Waiting 5 seconds for topics to be fully created...
+2025-10-23 14:19:42,759 - benchmark.workload_generator - INFO - ✅ Successfully created 1 topics
+2025-10-23 14:19:42,762 - benchmark.worker.local_worker - INFO - Registered 1 consumer metadata (V2: Agents will create actual consumers)
+2025-10-23 14:19:42,763 - benchmark.worker.local_worker - INFO - 📋 Consumer topics assigned to this worker: ['test-topic-0']
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - Created 1 consumers in 0.385158 ms
+2025-10-23 14:19:42,763 - benchmark.worker.local_worker - INFO - Registered 1 producer metadata (Agents will create actual producers)
+2025-10-23 14:19:42,763 - benchmark.worker.local_worker - INFO - 📋 Producer topics assigned to this worker: ['test-topic-0']
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - Created 1 producers in 0.131576 ms
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - 📊 AGENT DISTRIBUTION SUMMARY
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - 📈 Total Configuration:
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Topics: 1
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Partitions per Topic: 1
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Total Partitions: 1
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - 
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - 👥 Producer Agents:
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Producers per Topic: 1
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Total Producer Agents: 1
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - 
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - 👥 Consumer Agents:
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Subscriptions per Topic: 1
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Consumers per Subscription: 1
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Total Consumer Agents: 1
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - 
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO - 💻 Local Mode: Single worker
+2025-10-23 14:19:42,763 - benchmark.workload_generator - INFO -   Total Agents: 2 (1 producers + 1 consumers)
+2025-10-23 14:19:42,764 - benchmark.workload_generator - INFO - 
+2025-10-23 14:19:42,764 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:42,764 - benchmark.workload_generator - INFO - V2 架构: Skipping probe phase (Consumers will start with load)
+2025-10-23 14:19:42,764 - benchmark.workload_generator - INFO - Topics will be ready after start_load() spawns Consumer Agents
+2025-10-23 14:19:42,766 - benchmark.worker.local_worker - INFO - ================================================================================
+2025-10-23 14:19:42,766 - benchmark.worker.local_worker - INFO - Starting V2 ISOLATED mode: 2 independent Agent processes
+2025-10-23 14:19:42,766 - benchmark.worker.local_worker - INFO -   - Producer Agents: 1 (each @ 10000 msg/s)
+2025-10-23 14:19:42,766 - benchmark.worker.local_worker - INFO -   - Consumer Agents: 1
+2025-10-23 14:19:42,766 - benchmark.worker.local_worker - INFO - Total publish throughput: 10000 msg/s
+2025-10-23 14:19:42,766 - benchmark.worker.local_worker - INFO - ================================================================================
+2025-10-23 14:19:42,766 - benchmark.worker.local_worker - INFO - Detected Kafka driver, using Kafka agent workers
+2025-10-23 14:19:42,767 - benchmark.worker.local_worker - INFO - Stats directory does not exist, no cleanup needed
+2025-10-23 14:19:42,767 - benchmark.worker.local_worker - INFO - Stats collector thread started
+2025-10-23 14:19:42,774 - benchmark.worker.local_worker - INFO - Started 1 Producer Agent processes
+2025-10-23 14:19:42,781 - benchmark.worker.local_worker - INFO - Started 1 Consumer Agent processes
+2025-10-23 14:19:42,782 - benchmark.worker.local_worker - INFO - Total: 2 Agent processes running
+2025-10-23 14:19:42,782 - benchmark.worker.local_worker - INFO - Waiting for 2 Agents to report ready (timeout: 11.0s)
+2025-10-23 14:19:44,406 - benchmark.worker.local_worker - INFO - Producer Agent 0 is ready (1/2)
+2025-10-23 14:19:44,587 - benchmark.worker.local_worker - INFO - Consumer Agent 1 is ready (2/2)
+2025-10-23 14:19:44,588 - benchmark.worker.local_worker - INFO - Agent startup complete: 2 ready, 2 alive, 0 errors
+2025-10-23 14:19:44,588 - benchmark.worker.local_worker - INFO - ================================================================================
+2025-10-23 14:19:44,588 - benchmark.worker.local_worker - INFO - ⏳ Waiting 5.3s for Consumer Group rebalance to stabilize...
+2025-10-23 14:19:44,588 - benchmark.worker.local_worker - INFO -    This ensures all consumers have settled on their partition assignments
+2025-10-23 14:19:44,588 - benchmark.worker.local_worker - INFO -    Producer Agents are paused, waiting for start signal
+2025-10-23 14:19:44,588 - benchmark.worker.local_worker - INFO - ================================================================================
+2025-10-23 14:19:49,888 - benchmark.worker.local_worker - INFO - ✅ Consumer Group should now be stable
+2025-10-23 14:19:49,889 - benchmark.worker.local_worker - INFO - ✅ All Agents ready, waiting for workload start signal...
+2025-10-23 14:19:49,889 - benchmark.workload_generator - INFO - ----- Starting benchmark traffic (1m)------
+2025-10-23 14:19:49,889 - benchmark.workload_generator - INFO - 🚀 Signaling Producer Agents to start producing messages for benchmark...
+2025-10-23 14:19:49,889 - benchmark.workload_generator - INFO - ✅ Producer start signal sent (took 0.30ms)
+2025-10-23 14:19:59,956 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 64.3ms (pub: 1.3ms, delay: 1.4ms, e2e: 12.4ms)
+2025-10-23 14:20:00,010 - benchmark.workload_generator - INFO - Pub rate   793.6 msg/s /  0.8 MB/s | Pub err     0.0 err/s | Cons rate   774.7 msg/s /  0.8 MB/s | Backlog:  0.2 K | Pub Latency (ms) 50%: 4095.0 - 99%: 7172.0 - 99.9%: 7662.0 - Max: 7663.0 | Pub Delay (ms) 50%: 237.0 - 99%: 615.0 - 99.9%: 976.0 - Max: 978.0
+2025-10-23 14:20:10,057 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 43.9ms (pub: 1.3ms, delay: 1.2ms, e2e: 39.7ms)
+2025-10-23 14:20:10,066 - benchmark.workload_generator - INFO - Pub rate  1220.0 msg/s /  1.2 MB/s | Pub err     0.0 err/s | Cons rate  1288.5 msg/s /  1.3 MB/s | Backlog:  0.0 K | Pub Latency (ms) 50%: 6430.0 - 99%: 15728.0 - 99.9%: 15997.0 - Max: 16081.0 | Pub Delay (ms) 50%: 573.0 - 99%: 1457.0 - 99.9%: 1502.0 - Max: 1512.0
+2025-10-23 14:20:20,109 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 41.1ms (pub: 1.9ms, delay: 2.9ms, e2e: 25.3ms)
+2025-10-23 14:20:20,136 - benchmark.workload_generator - INFO - Pub rate  2656.7 msg/s /  2.6 MB/s | Pub err     0.0 err/s | Cons rate  2672.9 msg/s /  2.6 MB/s | Backlog:  0.0 K | Pub Latency (ms) 50%: 14926.0 - 99%: 22547.0 - 99.9%: 23079.0 - Max: 23119.0 | Pub Delay (ms) 50%: 1411.0 - 99%: 1768.0 - 99.9%: 1868.0 - Max: 1886.0
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+2025-10-23 14:20:30,158 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 18.6ms (pub: 1.3ms, delay: 2.0ms, e2e: 6.9ms)
+2025-10-23 14:20:30,186 - benchmark.workload_generator - INFO - Pub rate   781.9 msg/s /  0.8 MB/s | Pub err     0.0 err/s | Cons rate  1862.2 msg/s /  1.8 MB/s | Backlog:  0.0 K | Pub Latency (ms) 50%: 16981.0 - 99%: 25649.0 - 99.9%: 26634.0 - Max: 26637.0 | Pub Delay (ms) 50%: 1634.0 - 99%: 1864.0 - 99.9%: 1882.0 - Max: 1886.0
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms
+Agent 0 error in send loop: Local: Queue full
+Traceback (most recent call last):
+  File "/Users/lbw1125/Desktop/openmessaging-benchmark/benchmark/worker/isolated_agent_worker.py", line 246, in isolated_agent_worker
+    producer.produce(
+BufferError: Local: Queue full
+Agent 0 detected queue/buffer error, backing off for 100ms

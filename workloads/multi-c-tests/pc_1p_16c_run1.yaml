@@ -1,0 +1,17 @@
+name: Message PC Test - 1p-16c - Run 1
+
+topics: 1
+partitionsPerTopic: 16
+messageSize: 1024
+
+producersPerTopic: 1
+producerRate: 3000
+subscriptionsPerTopic: 1
+consumerPerSubscription: 16
+
+messageProcessingDelayMs: 5
+
+testDurationMinutes: 1
+warmupDurationMinutes: 0
+
+consumerBacklogSizeGB: 0

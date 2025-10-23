@@ -1,0 +1,49 @@
+2025-10-23 14:19:00,725 - benchmark.benchmark - INFO - Starting benchmark with config: {
+  "results_dir": null,
+  "drivers": [
+    "/Users/lbw1125/Desktop/openmessaging-benchmark/examples/kafka-driver.yaml"
+  ],
+  "workers": null,
+  "workers_file": null,
+  "extra_consumers": false,
+  "workloads": [
+    "/Users/lbw1125/Desktop/openmessaging-benchmark/workloads/msg-size-tests/msg_size_4096B_run1.yaml"
+  ],
+  "output": "/Users/lbw1125/Desktop/openmessaging-benchmark/throughput-tests/results_20251023_141730/size_4096B/result_run1.json"
+}
+2025-10-23 14:19:00,775 - benchmark.benchmark - INFO - Workloads: {
+  "msg_size_4096B_run1": {
+    "name": "Message Size Test - 4096B - Run 1",
+    "topics": 1,
+    "partitions_per_topic": 1,
+    "key_distributor": "NO_KEY",
+    "message_size": 4096,
+    "use_randomized_payloads": false,
+    "random_bytes_ratio": 0.0,
+    "randomized_payload_pool_size": 0,
+    "payload_file": null,
+    "subscriptions_per_topic": 1,
+    "producers_per_topic": 1,
+    "consumer_per_subscription": 1,
+    "producer_rate": 5000,
+    "consumer_backlog_size_gb": 0,
+    "backlog_drain_ratio": 1.0,
+    "test_duration_minutes": 1,
+    "warmup_duration_minutes": 0,
+    "message_processing_delay_ms": 0
+  }
+}
+2025-10-23 14:19:01,886 - benchmark.benchmark - INFO - Using LocalWorker (multi-process ISOLATED architecture)
+2025-10-23 14:19:01,957 - benchmark.worker.local_worker - INFO - Stats queue max size: 32000 (platform: Darwin)
+2025-10-23 14:19:02,014 - benchmark.worker.local_worker - INFO - LocalWorker initialized (multi-process ISOLATED architecture)
+2025-10-23 14:19:02,022 - benchmark.benchmark - INFO - --------------- WORKLOAD : Message Size Test - 4096B - Run 1 --- DRIVER : Kafka-Throughput---------------
+2025-10-23 14:19:02,029 - benchmark.worker.local_worker - INFO - Driver config: {'name': 'Kafka-Throughput', 'driverClass': 'benchmark.drivers.kafka.kafka_benchmark_driver.KafkaBenchmarkDriver', 'replicationFactor': 1, 'commonConfig': 'bootstrap.servers=localhost:9092\n', 'producerConfig': '# --- 基础可靠性 ---\nacks=1\nlinger.ms=10\nbatch.size=65536                     # 64KB 批处理（原 104857 太大时会挤压内存）\nmax.in.flight.requests.per.connection=5  # 控制并发请求，防止乱序和积压\nrequest.timeout.ms=300000\ndelivery.timeout.ms=1200000\n\n# --- ⭐ 核心防止 queue full 配置 ---\n# 增大缓冲区容量，让本地缓存更大\nqueue.buffering.max.kbytes=262144     # 256MB（原 1GB 太大，反而占内存）\nqueue.buffering.max.messages=2000000  # 最多200万条消息\nqueue.buffering.max.ms=50             # 允许缓冲50ms再flush\n\n# --- ⭐ 大消息支持 ---\nmessage.max.bytes=134217728           # 128MB\nmax.request.size=134217728\n\n# --- 压缩（如需省带宽可打开）---\n# compression.type=lz4\n\n# --- 网络缓冲区 ---\nsocket.send.buffer.bytes=524288\nsocket.receive.buffer.bytes=524288\n\n# --- 重试策略 ---\nretries=5\nretry.backoff.ms=500\n', 'consumerConfig': 'auto.offset.reset=earliest\nenable.auto.commit=false\nsession.timeout.ms=300000\nmax.poll.interval.ms=300000\n\nfetch.min.bytes=102400\nfetch.wait.max.ms=500\nfetch.message.max.bytes=134217728\nreceive.message.max.bytes=134217728\nqueued.min.messages=100000\n\nsocket.receive.buffer.bytes=524288\n', 'topicConfig': 'min.insync.replicas=1\nmax.message.bytes=134217728\n'}
+2025-10-23 14:19:02,194 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:02,194 - benchmark.workload_generator - INFO - 🧹 STEP 1: Cleaning up old topics for idempotent test
+2025-10-23 14:19:02,194 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:19:02,195 - benchmark.workload_generator - INFO - 🗑️  Attempting to delete 1 old topics: ['test-topic-0']
+2025-10-23 14:19:02,195 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Starting deletion of 1 topics: ['test-topic-0']
+2025-10-23 14:19:02,287 - benchmark.drivers.kafka.kafka_benchmark_driver - WARNING - ⚠️  Error deleting topic test-topic-0: KafkaError{code=UNKNOWN_TOPIC_OR_PART,val=3,str="Broker: Unknown topic or partition"}
+2025-10-23 14:19:02,287 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Deletion complete: 0/1 topics deleted
+2025-10-23 14:19:02,288 - benchmark.workload_generator - INFO - 🗑️  Deletion command completed in 92.450292 ms
+2025-10-23 14:19:02,288 - benchmark.workload_generator - INFO - ⏳ Waiting 20 seconds for completing asynchronous topic deletion...

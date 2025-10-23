@@ -1,0 +1,22 @@
+# Prometheus configuration for Pulsar monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'pulsar-benchmark'
+    monitor: 'pulsar-monitor'
+
+# Scrape configurations
+scrape_configs:
+  # Pulsar metrics (Pulsar exposes Prometheus metrics natively on port 8080)
+  - job_name: 'pulsar'
+    static_configs:
+      - targets: ['pulsar:8080']
+        labels:
+          service: 'pulsar'
+          instance: 'pulsar-standalone'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

@@ -1,43 +1,62 @@
-name: Kafka
+name: Kafka-Throughput
 driverClass: benchmark.drivers.kafka.kafka_benchmark_driver.KafkaBenchmarkDriver
 
-# Replication factor for Kafka topics
 replicationFactor: 1
 
-# Kafka common configuration
 commonConfig: |
   bootstrap.servers=localhost:9092
-# Producer-specific configuration (confluent-kafka uses librdkafka parameters)
+
+# =========================================================
+# 🧩 Producer Configuration
+# =========================================================
 producerConfig: |
+  # --- 基础可靠性 ---
   acks=1
   linger.ms=10
-  batch.size=1048576
+  batch.size=65536                     # 64KB 批处理（原 104857 太大时会挤压内存）
+  max.in.flight.requests.per.connection=5  # 控制并发请求，防止乱序和积压
   request.timeout.ms=300000
   delivery.timeout.ms=1200000
-  max.in.flight.requests.per.connection=10
-  # ✅ 修复：队列大小从 10TB 改为合理的 1GB（1048576 KB）
-  queue.buffering.max.kbytes=1048576
-  # ✅ 增加队列中的消息数量限制
-  queue.buffering.max.messages=1000000
-  # compression.type=lz4
-  # ⭐ 支持大消息：设置为 10MB（librdkafka 参数）
-  message.max.bytes=10485760
 
-# Consumer-specific configuration
+  # --- ⭐ 核心防止 queue full 配置 ---
+  # 增大缓冲区容量，让本地缓存更大
+  queue.buffering.max.kbytes=262144     # 256MB（原 1GB 太大，反而占内存）
+  queue.buffering.max.messages=2000000  # 最多200万条消息
+  queue.buffering.max.ms=50             # 允许缓冲50ms再flush
+
+  # --- ⭐ 大消息支持 ---
+  message.max.bytes=134217728           # 128MB
+  # --- 压缩（如需省带宽可打开）---
+  # compression.type=lz4
+
+  # --- 网络缓冲区 ---
+  socket.send.buffer.bytes=524288
+  socket.receive.buffer.bytes=524288
+
+  # --- 重试策略 ---
+  retries=5
+  retry.backoff.ms=500
+
+# =========================================================
+# 🧩 Consumer Configuration
+# =========================================================
 consumerConfig: |
   auto.offset.reset=earliest
   enable.auto.commit=false
   session.timeout.ms=300000
   max.poll.interval.ms=300000
-  # 性能优化参数 (librdkafka参数名)
-  fetch.min.bytes=10240
-  fetch.wait.max.ms=100
-  fetch.message.max.bytes=10485760
-  receive.message.max.bytes=100000000
+
+  fetch.min.bytes=102400
+  fetch.wait.max.ms=500
+  fetch.message.max.bytes=134217728
+  receive.message.max.bytes=134217728
   queued.min.messages=100000
 
-# Topic configuration
+  socket.receive.buffer.bytes=524288
+
+# =========================================================
+# 🧩 Topic Configuration
+# =========================================================
 topicConfig: |
   min.insync.replicas=1
-  # ⭐ 支持大消息：Topic 级别允许 10MB 消息
-  max.message.bytes=10485760
+  max.message.bytes=134217728

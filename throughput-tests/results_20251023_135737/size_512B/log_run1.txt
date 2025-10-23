@@ -1,0 +1,154 @@
+2025-10-23 14:04:29,322 - benchmark.benchmark - INFO - Starting benchmark with config: {
+  "results_dir": null,
+  "drivers": [
+    "/Users/lbw1125/Desktop/openmessaging-benchmark/examples/kafka-driver.yaml"
+  ],
+  "workers": null,
+  "workers_file": null,
+  "extra_consumers": false,
+  "workloads": [
+    "/Users/lbw1125/Desktop/openmessaging-benchmark/workloads/msg-size-tests/msg_size_512B_run1.yaml"
+  ],
+  "output": "/Users/lbw1125/Desktop/openmessaging-benchmark/throughput-tests/results_20251023_135737/size_512B/result_run1.json"
+}
+2025-10-23 14:04:29,340 - benchmark.benchmark - INFO - Workloads: {
+  "msg_size_512B_run1": {
+    "name": "Message Size Test - 512B - Run 1",
+    "topics": 1,
+    "partitions_per_topic": 1,
+    "key_distributor": "NO_KEY",
+    "message_size": 512,
+    "use_randomized_payloads": false,
+    "random_bytes_ratio": 0.0,
+    "randomized_payload_pool_size": 0,
+    "payload_file": null,
+    "subscriptions_per_topic": 1,
+    "producers_per_topic": 1,
+    "consumer_per_subscription": 1,
+    "producer_rate": 200000,
+    "consumer_backlog_size_gb": 0,
+    "backlog_drain_ratio": 1.0,
+    "test_duration_minutes": 1,
+    "warmup_duration_minutes": 0,
+    "message_processing_delay_ms": 0
+  }
+}
+2025-10-23 14:04:30,522 - benchmark.benchmark - INFO - Using LocalWorker (multi-process ISOLATED architecture)
+2025-10-23 14:04:30,586 - benchmark.worker.local_worker - INFO - Stats queue max size: 32000 (platform: Darwin)
+2025-10-23 14:04:30,624 - benchmark.worker.local_worker - INFO - LocalWorker initialized (multi-process ISOLATED architecture)
+2025-10-23 14:04:30,654 - benchmark.benchmark - INFO - --------------- WORKLOAD : Message Size Test - 512B - Run 1 --- DRIVER : Kafka-Throughput---------------
+2025-10-23 14:04:30,661 - benchmark.worker.local_worker - INFO - Driver config: {'name': 'Kafka-Throughput', 'driverClass': 'benchmark.drivers.kafka.kafka_benchmark_driver.KafkaBenchmarkDriver', 'replicationFactor': 1, 'commonConfig': 'bootstrap.servers=localhost:9092\n', 'producerConfig': '# 基础配置\nacks=1\n\n# 批处理优化 - 减小等待时间，让消息更快发出\nlinger.ms=10\nbatch.size=104857\n\n# 超时配置 - 给予足够时间\nrequest.timeout.ms=300000\ndelivery.timeout.ms=1200000\n\n# 并发请求数 - 增加以提高吞吐量\nmax.in.flight.requests.per.connection=20\n\n# ⭐ 关键：内存缓冲区配置（避免 Queue Full）\n# 减少缓冲区大小，确保消息能及时发送（不在队列中积压）\nqueue.buffering.max.kbytes=1048576\n\n# 队列中最大消息数 - 减少到 100万条，避免停止时积压太多\nqueue.buffering.max.messages=1000000\n\n# 压缩 - 根据需要启用（会降低吞吐但节省带宽）\n# compression.type=lz4\n\n# Socket 缓冲区 - 增大以提高网络吞吐\nsocket.send.buffer.bytes=131072\nsocket.receive.buffer.bytes=131072\n\n# 重试配置\nretries=2147483647\nretry.backoff.ms=100\n\n# 内部队列配置 - 减少批处理等待时间，让消息更快发出\nqueue.buffering.max.ms=5\n\n# ⭐ 支持大消息：设置为 128MB（librdkafka 参数）\nmessage.max.bytes=134217728\n', 'consumerConfig': 'auto.offset.reset=earliest\nenable.auto.commit=false\nsession.timeout.ms=300000\nmax.poll.interval.ms=300000\n\n# 性能优化参数\nfetch.min.bytes=102400\nfetch.wait.max.ms=500\nfetch.message.max.bytes=134217728\nreceive.message.max.bytes=134217728\nqueued.min.messages=100000\n\n# Socket 缓冲区\nsocket.receive.buffer.bytes=131072\n', 'topicConfig': 'min.insync.replicas=1\n# ⭐ 支持大消息：Topic 级别允许 128MB 消息\nmax.message.bytes=134217728\n'}
+2025-10-23 14:04:30,746 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:04:30,747 - benchmark.workload_generator - INFO - 🧹 STEP 1: Cleaning up old topics for idempotent test
+2025-10-23 14:04:30,748 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:04:30,749 - benchmark.workload_generator - INFO - 🗑️  Attempting to delete 1 old topics: ['test-topic-0']
+2025-10-23 14:04:30,749 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Starting deletion of 1 topics: ['test-topic-0']
+2025-10-23 14:04:30,766 - benchmark.drivers.kafka.kafka_benchmark_driver - WARNING - ⚠️  Error deleting topic test-topic-0: KafkaError{code=UNKNOWN_TOPIC_OR_PART,val=3,str="Broker: Unknown topic or partition"}
+2025-10-23 14:04:30,767 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Deletion complete: 0/1 topics deleted
+2025-10-23 14:04:30,768 - benchmark.workload_generator - INFO - 🗑️  Deletion command completed in 18.952634 ms
+2025-10-23 14:04:30,768 - benchmark.workload_generator - INFO - ⏳ Waiting 20 seconds for completing asynchronous topic deletion...
+2025-10-23 14:04:50,770 - benchmark.workload_generator - INFO - ✅ Old topic cleanup completed
+2025-10-23 14:04:50,770 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:04:50,770 - benchmark.workload_generator - INFO - 📝 STEP 2: Creating new topics
+2025-10-23 14:04:50,770 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:04:50,771 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 📝 Starting creation of 1 topics: ['test-topic-0']
+2025-10-23 14:04:50,771 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 📝 Topic config properties: {'min.insync.replicas': 1, 'max.message.bytes': 134217728}
+2025-10-23 14:04:50,941 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - ✅ Created topic: test-topic-0 (partitions=1, replication=1)
+2025-10-23 14:04:50,941 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 📝 Topic creation complete: 1 created, 0 already existed
+2025-10-23 14:04:50,941 - benchmark.workload_generator - INFO - ✅ Topic creation command completed in 170.309378 ms
+2025-10-23 14:04:50,941 - benchmark.workload_generator - INFO - ⏳ Waiting 5 seconds for topics to be fully created...
+2025-10-23 14:04:55,944 - benchmark.workload_generator - INFO - ✅ Successfully created 1 topics
+2025-10-23 14:04:55,946 - benchmark.worker.local_worker - INFO - Registered 1 consumer metadata (V2: Agents will create actual consumers)
+2025-10-23 14:04:55,946 - benchmark.worker.local_worker - INFO - 📋 Consumer topics assigned to this worker: ['test-topic-0']
+2025-10-23 14:04:55,946 - benchmark.workload_generator - INFO - Created 1 consumers in 0.354428 ms
+2025-10-23 14:04:55,946 - benchmark.worker.local_worker - INFO - Registered 1 producer metadata (Agents will create actual producers)
+2025-10-23 14:04:55,947 - benchmark.worker.local_worker - INFO - 📋 Producer topics assigned to this worker: ['test-topic-0']
+2025-10-23 14:04:55,947 - benchmark.workload_generator - INFO - Created 1 producers in 0.82508 ms
+2025-10-23 14:04:55,947 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:04:55,947 - benchmark.workload_generator - INFO - 📊 AGENT DISTRIBUTION SUMMARY
+2025-10-23 14:04:55,947 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:04:55,947 - benchmark.workload_generator - INFO - 📈 Total Configuration:
+2025-10-23 14:04:55,947 - benchmark.workload_generator - INFO -   Topics: 1
+2025-10-23 14:04:55,947 - benchmark.workload_generator - INFO -   Partitions per Topic: 1
+2025-10-23 14:04:55,947 - benchmark.workload_generator - INFO -   Total Partitions: 1
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO - 
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO - 👥 Producer Agents:
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO -   Producers per Topic: 1
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO -   Total Producer Agents: 1
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO - 
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO - 👥 Consumer Agents:
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO -   Subscriptions per Topic: 1
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO -   Consumers per Subscription: 1
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO -   Total Consumer Agents: 1
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO - 
+2025-10-23 14:04:55,948 - benchmark.workload_generator - INFO - 💻 Local Mode: Single worker
+2025-10-23 14:04:55,949 - benchmark.workload_generator - INFO -   Total Agents: 2 (1 producers + 1 consumers)
+2025-10-23 14:04:55,949 - benchmark.workload_generator - INFO - 
+2025-10-23 14:04:55,949 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:04:55,949 - benchmark.workload_generator - INFO - V2 架构: Skipping probe phase (Consumers will start with load)
+2025-10-23 14:04:55,949 - benchmark.workload_generator - INFO - Topics will be ready after start_load() spawns Consumer Agents
+2025-10-23 14:04:55,951 - benchmark.worker.local_worker - INFO - ================================================================================
+2025-10-23 14:04:55,952 - benchmark.worker.local_worker - INFO - Starting V2 ISOLATED mode: 2 independent Agent processes
+2025-10-23 14:04:55,952 - benchmark.worker.local_worker - INFO -   - Producer Agents: 1 (each @ 200000 msg/s)
+2025-10-23 14:04:55,952 - benchmark.worker.local_worker - INFO -   - Consumer Agents: 1
+2025-10-23 14:04:55,952 - benchmark.worker.local_worker - INFO - Total publish throughput: 200000 msg/s
+2025-10-23 14:04:55,952 - benchmark.worker.local_worker - INFO - ================================================================================
+2025-10-23 14:04:55,952 - benchmark.worker.local_worker - INFO - Detected Kafka driver, using Kafka agent workers
+2025-10-23 14:04:55,952 - benchmark.worker.local_worker - INFO - Stats directory does not exist, no cleanup needed
+2025-10-23 14:04:55,952 - benchmark.worker.local_worker - INFO - Stats collector thread started
+2025-10-23 14:04:55,958 - benchmark.worker.local_worker - INFO - Started 1 Producer Agent processes
+2025-10-23 14:04:55,965 - benchmark.worker.local_worker - INFO - Started 1 Consumer Agent processes
+2025-10-23 14:04:55,966 - benchmark.worker.local_worker - INFO - Total: 2 Agent processes running
+2025-10-23 14:04:55,966 - benchmark.worker.local_worker - INFO - Waiting for 2 Agents to report ready (timeout: 11.0s)
+2025-10-23 14:04:57,569 - benchmark.worker.local_worker - INFO - Producer Agent 0 is ready (1/2)
+2025-10-23 14:04:57,580 - benchmark.worker.local_worker - INFO - Consumer Agent 1 is ready (2/2)
+2025-10-23 14:04:57,580 - benchmark.worker.local_worker - INFO - Agent startup complete: 2 ready, 2 alive, 0 errors
+2025-10-23 14:04:57,580 - benchmark.worker.local_worker - INFO - ================================================================================
+2025-10-23 14:04:57,580 - benchmark.worker.local_worker - INFO - ⏳ Waiting 5.3s for Consumer Group rebalance to stabilize...
+2025-10-23 14:04:57,580 - benchmark.worker.local_worker - INFO -    This ensures all consumers have settled on their partition assignments
+2025-10-23 14:04:57,580 - benchmark.worker.local_worker - INFO -    Producer Agents are paused, waiting for start signal
+2025-10-23 14:04:57,581 - benchmark.worker.local_worker - INFO - ================================================================================
+2025-10-23 14:05:02,881 - benchmark.worker.local_worker - INFO - ✅ Consumer Group should now be stable
+2025-10-23 14:05:02,881 - benchmark.worker.local_worker - INFO - ✅ All Agents ready, waiting for workload start signal...
+2025-10-23 14:05:02,881 - benchmark.workload_generator - INFO - ----- Starting benchmark traffic (1m)------
+2025-10-23 14:05:02,881 - benchmark.workload_generator - INFO - 🚀 Signaling Producer Agents to start producing messages for benchmark...
+2025-10-23 14:05:02,881 - benchmark.workload_generator - INFO - ✅ Producer start signal sent (took 0.17ms)
+2025-10-23 14:05:12,910 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 26.2ms (pub: 2.6ms, delay: 2.2ms, e2e: 10.5ms)
+2025-10-23 14:05:12,919 - benchmark.workload_generator - INFO - Pub rate  5847.1 msg/s /  2.9 MB/s | Pub err     0.0 err/s | Cons rate  5031.5 msg/s /  2.5 MB/s | Backlog:  8.2 K | Pub Latency (ms) 50%: 1515.0 - 99%: 3930.0 - 99.9%: 4146.0 - Max: 4181.0 | Pub Delay (ms) 50%: 1571.0 - 99%: 4525.0 - 99.9%: 4721.0 - Max: 4724.0
+2025-10-23 14:05:22,925 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 5.4ms (pub: 1.3ms, delay: 1.2ms, e2e: 1.3ms)
+2025-10-23 14:05:22,935 - benchmark.workload_generator - INFO - Pub rate  4739.4 msg/s /  2.3 MB/s | Pub err     0.0 err/s | Cons rate  5274.8 msg/s /  2.6 MB/s | Backlog:  2.8 K | Pub Latency (ms) 50%: 2137.0 - 99%: 8620.0 - 99.9%: 8674.0 - Max: 8741.0 | Pub Delay (ms) 50%: 3102.0 - 99%: 9459.0 - 99.9%: 10511.0 - Max: 10601.0
+2025-10-23 14:05:32,952 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 16.3ms (pub: 1.2ms, delay: 1.2ms, e2e: 5.2ms)
+2025-10-23 14:05:32,971 - benchmark.workload_generator - INFO - Pub rate  8086.1 msg/s /  4.0 MB/s | Pub err     0.0 err/s | Cons rate  7609.2 msg/s /  3.7 MB/s | Backlog:  7.6 K | Pub Latency (ms) 50%: 6921.0 - 99%: 9745.0 - 99.9%: 10081.0 - Max: 10140.0 | Pub Delay (ms) 50%: 6485.0 - 99%: 17764.0 - 99.9%: 18417.0 - Max: 18614.0
+2025-10-23 14:05:42,987 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 15.2ms (pub: 1.1ms, delay: 1.1ms, e2e: 5.6ms)
+2025-10-23 14:05:43,006 - benchmark.workload_generator - INFO - Pub rate  7653.4 msg/s /  3.8 MB/s | Pub err     0.0 err/s | Cons rate  6999.1 msg/s /  3.4 MB/s | Backlog: 14.1 K | Pub Latency (ms) 50%: 8776.0 - 99%: 12570.0 - 99.9%: 12751.0 - Max: 12757.0 | Pub Delay (ms) 50%: 11663.0 - 99%: 24345.0 - 99.9%: 25560.0 - Max: 25763.0
+2025-10-23 14:05:53,012 - benchmark.worker.worker_stats - INFO - ⏱️  to_period_stats() took 2.8ms (pub: 0.2ms, delay: 0.2ms, e2e: 1.3ms)
+2025-10-23 14:05:53,032 - benchmark.workload_generator - INFO - Pub rate  7098.1 msg/s /  3.5 MB/s | Pub err     0.0 err/s | Cons rate  8486.0 msg/s /  4.2 MB/s | Backlog:  0.2 K | Pub Latency (ms) 50%: 9295.0 - 99%: 15491.0 - 99.9%: 15924.0 - Max: 16404.0 | Pub Delay (ms) 50%: 15957.0 - 99%: 30352.0 - 99.9%: 31517.0 - Max: 31758.0
+2025-10-23 14:06:03,033 - benchmark.workload_generator - INFO - ----- Test duration reached, stopping agents ------
+2025-10-23 14:06:03,033 - benchmark.workload_generator - INFO - Capturing final counters snapshot before stopping agents...
+2025-10-23 14:06:03,033 - benchmark.workload_generator - INFO - Snapshot: sent=421662, received=411513
+2025-10-23 14:06:03,033 - benchmark.worker.local_worker - INFO - Stopping 2 Agent processes...
+2025-10-23 14:06:13,037 - benchmark.worker.local_worker - WARNING - 1 Agent processes still running, giving 3s grace period...
+%4|1761221173.052|TERMINATE|agent-0-producer#producer-1| [thrd:app]: Producer terminating with 47477 messages (24450655 bytes) still in queue or transit: use flush() to wait for outstanding message delivery
+2025-10-23 14:06:16,039 - benchmark.worker.local_worker - INFO - All Agent processes stopped
+2025-10-23 14:06:16,072 - benchmark.worker.local_worker - INFO - Stats collector thread stopped
+2025-10-23 14:06:16,072 - benchmark.worker.local_worker - INFO - Stats collector stopped
+2025-10-23 14:06:16,074 - benchmark.workload_generator - INFO - ----- Calculating final aggregated statistics ------
+2025-10-23 14:06:20,852 - benchmark.workload_generator - INFO - ----- Aggregated Pub Latency (ms) avg: 8079.6 - 50%: 8832.0 - 95%: 15746.0 - 99%: 17363.0 - 99.9%: 17770.0 - 99.99%: 18016.0 - Max: 18103.0 | Pub Delay (ms) avg: 13354.5 - 50%: 12121.0 - 95%: 30998.0 - 99%: 36098.0 - 99.9%: 38669.0 - 99.99%: 39657.0 - Max: 39785.0
+2025-10-23 14:06:40,686 - benchmark.workload_generator - INFO - Using pre-stop snapshot for final statistics
+2025-10-23 14:06:40,687 - benchmark.workload_generator - INFO - ----- Aggregated Throughput: Publish Rate:  7010.0 msg/s /  3.4 MB/s | Consume Rate:  6841.3 msg/s /  3.3 MB/s | Total Messages Sent: 421662 | Total Messages Received: 411513 | Message Loss Rate:  2.4% | Actual Test Duration: 60.2 s ------
+2025-10-23 14:06:40,688 - benchmark.benchmark - INFO - Writing test result into /Users/lbw1125/Desktop/openmessaging-benchmark/throughput-tests/results_20251023_135737/size_512B/result_run1.json
+2025-10-23 14:06:40,717 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:06:40,717 - benchmark.workload_generator - INFO - 🗑️  STEP 3: Cleaning up topics after test (for idempotency)
+2025-10-23 14:06:40,718 - benchmark.workload_generator - INFO - ================================================================================
+2025-10-23 14:06:40,720 - benchmark.workload_generator - INFO - 🗑️  Deleting 1 topics: ['test-topic-0']
+2025-10-23 14:06:40,722 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Starting deletion of 1 topics: ['test-topic-0']
+2025-10-23 14:06:40,867 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - ✅ Deleted topic: test-topic-0
+2025-10-23 14:06:40,867 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Deletion complete: 1/1 topics deleted
+2025-10-23 14:06:40,867 - benchmark.workload_generator - INFO - 🗑️  Deletion command completed in 145.35026 ms
+2025-10-23 14:06:40,871 - benchmark.workload_generator - INFO - ⏳ Waiting 10 seconds for Kafka to complete asynchronous topic deletion...
+2025-10-23 14:06:50,879 - benchmark.workload_generator - INFO - ✅ Post-test cleanup completed
+2025-10-23 14:06:50,880 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - ⏳ Waiting 2 seconds for consumers to fully disconnect...
+2025-10-23 14:06:52,885 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - ℹ️  Consumer groups are not deleted (using timestamped unique names per test run)
+2025-10-23 14:06:52,885 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Deleting 1 topics: ['test-topic-0']
+2025-10-23 14:06:52,888 - benchmark.drivers.kafka.kafka_benchmark_driver - WARNING - ⚠️  Failed to delete topic test-topic-0: KafkaError{code=UNKNOWN_TOPIC_OR_PART,val=3,str="Broker: Unknown topic or partition"}
+2025-10-23 14:06:52,888 - benchmark.drivers.kafka.kafka_benchmark_driver - INFO - 🗑️  Deletion complete: 0/1 topics deleted

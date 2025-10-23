@@ -1,0 +1,15 @@
+name: Message Size Test - 8B - Run 1
+
+topics: 1
+partitionsPerTopic: 16
+messageSize: 8
+
+producersPerTopic: 4
+producerRate: 30000
+subscriptionsPerTopic: 1
+consumerPerSubscription: 4
+
+testDurationMinutes: 1
+warmupDurationMinutes: 0
+
+consumerBacklogSizeGB: 0

@@ -1,0 +1,17 @@
+name: Message PC Test - 8p-8c - Run 1
+
+topics: 1
+partitionsPerTopic: 16
+messageSize: 1024
+
+producersPerTopic: 8
+producerRate: 125
+subscriptionsPerTopic: 1
+consumerPerSubscription: 8
+
+messageProcessingDelayMs: 0
+
+testDurationMinutes: 1
+warmupDurationMinutes: 0
+
+consumerBacklogSizeGB: 0

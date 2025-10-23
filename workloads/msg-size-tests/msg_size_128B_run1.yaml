@@ -1,0 +1,15 @@
+name: Message Size Test - 128B - Run 1
+
+topics: 1
+partitionsPerTopic: 1
+messageSize: 128
+
+producersPerTopic: 1
+producerRate: 200000
+subscriptionsPerTopic: 1
+consumerPerSubscription: 1
+
+testDurationMinutes: 1
+warmupDurationMinutes: 0
+
+consumerBacklogSizeGB: 0

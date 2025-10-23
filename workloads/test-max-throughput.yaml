@@ -2,20 +2,20 @@ name: Slow Consumer High Parallelism Test
 
 topics: 1
 partitionsPerTopic: 1
-messageSize: 15360
+messageSize: 456
 
 producersPerTopic: 1
-producerRate: 500      
+producerRate: 50000      
 subscriptionsPerTopic: 1
 consumerPerSubscription: 1
-# # Backlog 配置
-# consumerBacklogSizeGB: 0.1  
+# Backlog 配置
+# consumerBacklogSizeGB: 5  
 # backlogDrainRatio: 1.0     
 
 # 慢速消费者配置
 # 每条消息处理延迟 100ms，模拟慢速消费场景
 # 使用4个消费者应该能获得接近2倍的吞吐量提升
-# messageProcessingDelayMs: 0
+# messageProcessingDelayMs: 10
 
 testDurationMinutes: 2
 warmupDurationMinutes: 0

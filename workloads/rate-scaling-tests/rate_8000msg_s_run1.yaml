@@ -1,0 +1,15 @@
+name: Publish Rate Scaling Test - 8000msg/s - Run 1
+
+topics: 1
+partitionsPerTopic: 1
+messageSize: 1024
+
+producersPerTopic: 1
+producerRate: 8000
+subscriptionsPerTopic: 1
+consumerPerSubscription: 1
+
+testDurationMinutes: 1
+warmupDurationMinutes: 0
+
+consumerBacklogSizeGB: 0

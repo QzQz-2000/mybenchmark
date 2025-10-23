@@ -1,0 +1,29 @@
+# Prometheus configuration for Kafka monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'kafka-benchmark'
+    monitor: 'kafka-monitor'
+
+# Scrape configurations
+scrape_configs:
+  # Kafka JMX metrics via JMX Exporter
+  - job_name: 'kafka-jmx'
+    static_configs:
+      - targets: ['kafka-jmx-exporter:5556']
+        labels:
+          service: 'kafka'
+          instance: 'kafka-broker-1'
+
+  # cAdvisor - Container metrics (CPU, Memory, Network, Disk I/O)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

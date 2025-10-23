@@ -1,82 +1,20 @@
 name: Kafka-Optimized-MultiConsumer
 driverClass: benchmark.drivers.kafka.kafka_benchmark_driver.KafkaBenchmarkDriver
 
-# Replication factor for Kafka topics
 replicationFactor: 1
 
-# Kafka common configuration
-commonConfig: |
-  bootstrap.servers=localhost:9092,localhost:9093,localhost:9094
-
-# Producer-specific configuration (confluent-kafka uses librdkafka parameters)
-producerConfig: |
-  acks=1
-  linger.ms=10
-  batch.size=1048576
-  request.timeout.ms=300000
-  delivery.timeout.ms=1200000
-  max.in.flight.requests.per.connection=10
-  # ✅ 修复：队列大小设置为 1GB（1048576 KB）
-  queue.buffering.max.kbytes=1048576
-  # ✅ 增加队列中的消息数量限制
-  queue.buffering.max.messages=1000000
-  compression.type=lz4
-
-# Consumer-specific configuration - OPTIMIZED FOR MULTI-CONSUMER
-consumerConfig: |
-  auto.offset.reset=earliest
-  enable.auto.commit=true
-  auto.commit.interval.ms=5000
-
-  # ✅ Rebalance 优化配置
-  # 使用 CooperativeSticky 策略：增量 rebalance，不停止所有 consumer
-  partition.assignment.strategy=cooperative-sticky
-
-  # ✅ Session timeout 优化
-  # 增加 session timeout，减少因网络抖动导致的 rebalance
-  session.timeout.ms=30000
-
-  # ✅ Heartbeat 优化
-  # 减少 heartbeat 间隔，coordinator 可以更快检测到稳定状态
-  heartbeat.interval.ms=3000
-
-  # ✅ Poll 优化
-  # 增加 max poll interval，避免处理慢导致的 rebalance
-  max.poll.interval.ms=300000
-
-  # ✅ 性能优化参数 (librdkafka参数名)
-  fetch.min.bytes=10240
-  fetch.wait.max.ms=100
-  fetch.message.max.bytes=10485760
-  receive.message.max.bytes=100000000
-  queued.min.messages=100000
-
-  # ✅ 减少不必要的元数据刷新
-  metadata.max.age.ms=300000
-
-# Topic configuration
 topicConfig: |
   min.insync.replicas=1
 
-# 配置说明：
-# ================================================================================
-# partition.assignment.strategy=cooperative-sticky
-#   - 默认策略是 range/roundrobin（eager rebalance）：所有 consumer 停止消费
-#   - cooperative-sticky 是增量 rebalance：只有受影响的 partition 停止
-#   - 延迟降低：从全停到部分停，显著减少 rebalance 影响
-#   - 要求：Kafka 2.4+
-#
-# session.timeout.ms=30000
-#   - 默认值通常是 10000ms（10秒），容易误判
-#   - 增加到 30 秒：给网络抖动和 GC 停顿更多容忍度
-#   - 副作用：故障检测变慢（但测试场景无所谓）
-#
-# heartbeat.interval.ms=3000
-#   - 心跳间隔，必须 < session.timeout.ms / 3
-#   - 更频繁的心跳让 coordinator 更快确认 consumer 稳定
-#
-# 预期效果：
-#   - Rebalance 次数：从 N 次降到 1-2 次
-#   - Rebalance 时长：从秒级降到毫秒级（cooperative）
-#   - 延迟改善：预计 30-50% 的延迟降低
-# ================================================================================
+commonConfig: |
+  bootstrap.servers=localhost:9092
+
+producerConfig: |
+  acks=all
+  linger.ms=1
+  batch.size=131072
+
+consumerConfig: |
+  auto.offset.reset=earliest
+  enable.auto.commit=false
+  max.partition.fetch.bytes=10485760

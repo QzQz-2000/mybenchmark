@@ -1,0 +1,4 @@
+TargetPublishRate(msg/s),LatencyAvg_Avg(ms),LatencyAvg_Std(ms),Latency50_Avg(ms),Latency50_Std(ms),Latency75_Avg(ms),Latency75_Std(ms),Latency95_Avg(ms),Latency95_Std(ms),Latency99_Avg(ms),Latency99_Std(ms),ProducerRate_Avg,ProducerRate_Std,ConsumerRate_Avg,ConsumerRate_Std,ProducerThroughput_Avg(MB/s),ProducerThroughput_Std(MB/s),ConsumerThroughput_Avg(MB/s),ConsumerThroughput_Std(MB/s),Iterations
+1000,547.4936841363797,0,547,0,697,0,948,0,1447,0,972.7491967960865,0,988.6969965450452,0,3.799801549984713,0,3.8620976427540827,0,1
+2000,1636.4779736628716,0,1406,0,2129,0,3075,0,4095,0,1829.988535352522,0,1822.7647211894664,0,7.148392716220789,0,7.120174692146353,0,1
+4000,10528.735522756027,0,8844,0,15981,0,24024,0,30196,0,1419.5434997709847,0,1721.6431461753361,0,5.545091795980409,0,6.725168539747407,0,1
